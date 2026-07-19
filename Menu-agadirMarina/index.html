@@ -130,24 +130,131 @@ body:before{opacity:.18!important;background-image:linear-gradient(135deg,rgba(2
 </style>
 
 <style id="mobile-wifi-lang-fix">
-.storeLabel{margin-top:8px;font-weight:900;color:#cf4b92;font-size:14px;letter-spacing:.02em}
-@media(max-width:720px){
- .navActions{display:flex!important;position:fixed!important;right:12px!important;bottom:82px!important;z-index:120!important;gap:8px!important}
- .navActions .pillBtn{display:none!important}
- .navActions #langToggle,.navActions #openWifi{display:flex!important;width:48px!important;height:48px!important;padding:0!important;align-items:center!important;justify-content:center!important;border-radius:50%!important;background:#fff!important;color:#cf4b92!important;border:1px solid rgba(207,75,146,.25)!important;box-shadow:0 10px 26px rgba(151,54,105,.18)!important;font-size:11px!important}
- .navActions #openWifi{font-size:0!important}
- .navActions #openWifi:after{content:"Wi‑Fi";font-size:10px!important;font-weight:900!important}
+.storeLabel{
+  margin-top:8px;
+  font-weight:900;
+  color:#cf4b92;
+  font-size:14px;
+  letter-spacing:.02em;
 }
-</style>
 
-<style id="mobile-wifi-lang-fix">
-.storeLabel{margin-top:8px;font-weight:900;color:#cf4b92;font-size:14px;letter-spacing:.02em}
-@media(max-width:720px){
- .navActions{display:flex!important;position:fixed!important;right:12px!important;bottom:82px!important;z-index:120!important;gap:8px!important}
- .navActions .pillBtn{display:none!important}
- .navActions #langToggle,.navActions #openWifi{display:flex!important;width:48px!important;height:48px!important;padding:0!important;align-items:center!important;justify-content:center!important;border-radius:50%!important;background:#fff!important;color:#cf4b92!important;border:1px solid rgba(207,75,146,.25)!important;box-shadow:0 10px 26px rgba(151,54,105,.18)!important;font-size:11px!important}
- .navActions #openWifi{font-size:0!important}
- .navActions #openWifi:after{content:"Wi‑Fi";font-size:10px!important;font-weight:900!important}
+/* Ordinateur : on conserve la disposition originale */
+@media(min-width:741px){
+  .topbar{
+    grid-template-columns:auto minmax(260px,1fr) auto !important;
+    align-items:center !important;
+  }
+
+  .brand{
+    justify-content:flex-start !important;
+  }
+
+  .navActions{
+    position:static !important;
+    display:flex !important;
+    width:auto !important;
+    justify-content:flex-end !important;
+    gap:8px !important;
+  }
+
+  .navActions .pillBtn{
+    display:inline-flex !important;
+  }
+
+  .searchBox{
+    grid-column:auto !important;
+    order:initial !important;
+  }
+}
+
+/* Mobile */
+@media(max-width:740px){
+  .topbar{
+    position:sticky !important;
+    top:0 !important;
+    display:grid !important;
+    grid-template-columns:1fr auto !important;
+    grid-template-areas:
+      "brand actions"
+      "search search" !important;
+    align-items:center !important;
+    gap:8px !important;
+    padding:9px 12px 11px !important;
+  }
+
+  .brand{
+    grid-area:brand !important;
+    justify-content:flex-start !important;
+    min-width:0 !important;
+  }
+
+  .logo{
+    width:118px !important;
+    height:48px !important;
+  }
+
+  .logo img{
+    width:auto !important;
+    max-width:112px !important;
+    max-height:46px !important;
+  }
+
+  .navActions{
+    grid-area:actions !important;
+    position:static !important;
+    display:flex !important;
+    width:auto !important;
+    justify-content:flex-end !important;
+    align-items:center !important;
+    gap:6px !important;
+    overflow:visible !important;
+  }
+
+  .navActions .pillBtn{
+    display:none !important;
+  }
+
+  .navActions #langToggle,
+  .navActions #openWifi{
+    display:inline-flex !important;
+    width:auto !important;
+    min-width:48px !important;
+    height:38px !important;
+    padding:0 11px !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:5px !important;
+    border-radius:999px !important;
+    background:#fff !important;
+    color:#cf4b92 !important;
+    border:1px solid rgba(207,75,146,.24) !important;
+    box-shadow:none !important;
+    font-size:11px !important;
+    font-weight:900 !important;
+  }
+
+  .navActions #openWifi{
+    font-size:0 !important;
+  }
+
+  .navActions #openWifi::after{
+    content:"Wi-Fi" !important;
+    font-size:11px !important;
+    font-weight:900 !important;
+  }
+
+  .searchBox{
+    grid-area:search !important;
+    grid-column:auto !important;
+    order:initial !important;
+    width:100% !important;
+    height:44px !important;
+    margin:0 !important;
+  }
+
+  .stickyNav.compactNav{
+    top:110px !important;
+  }
 }
 </style>
 </head><body>
