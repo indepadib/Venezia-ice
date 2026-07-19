@@ -130,13 +130,76 @@ body:before{opacity:.18!important;background-image:linear-gradient(135deg,rgba(2
 </style>
 
 <style id="mobile-wifi-lang-fix">
-.storeLabel{margin-top:8px;font-weight:900;color:#cf4b92;font-size:14px;letter-spacing:.02em}
+.storeLabel{
+  margin-top:8px;
+  font-weight:900;
+  color:#cf4b92;
+  font-size:14px;
+  letter-spacing:.02em;
+}
 @media(max-width:720px){
- .navActions{display:flex!important;position:fixed!important;right:12px!important;bottom:82px!important;z-index:120!important;gap:8px!important}
- .navActions .pillBtn{display:none!important}
- .navActions #langToggle,.navActions #openWifi{display:flex!important;width:48px!important;height:48px!important;padding:0!important;align-items:center!important;justify-content:center!important;border-radius:50%!important;background:#fff!important;color:#cf4b92!important;border:1px solid rgba(207,75,146,.25)!important;box-shadow:0 10px 26px rgba(151,54,105,.18)!important;font-size:11px!important}
- .navActions #openWifi{font-size:0!important}
- .navActions #openWifi:after{content:"Wi‑Fi";font-size:10px!important;font-weight:900!important}
+  /* Logo seul sur la première ligne */
+  .topbar{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:8px!important;
+  }
+
+  .brand{
+    order:1!important;
+    width:100%!important;
+    justify-content:center!important;
+  }
+  /* Boutons placés proprement SOUS le logo */
+  .navActions{
+    order:2!important;
+    position:static!important;
+    display:flex!important;
+    width:100%!important;
+    justify-content:center!important;
+    align-items:center!important;
+    gap:8px!important;
+    overflow:visible!important;
+  }
+  /* Masquer Top ventes et Réinitialiser sur mobile */
+  .navActions .pillBtn{
+    display:none!important;
+  }
+  /* Afficher uniquement langue et Wi-Fi */
+  .navActions #langToggle,
+  .navActions #openWifi{
+    display:inline-flex!important;
+    width:auto!important;
+    min-width:76px!important;
+    height:38px!important;
+    padding:0 14px!important;
+    align-items:center!important;
+    justify-content:center!important;
+    border-radius:999px!important;
+    background:#fff!important;
+    color:#cf4b92!important;
+    border:1px solid rgba(207,75,146,.25)!important;
+    box-shadow:0 6px 18px rgba(151,54,105,.12)!important;
+    font-size:11px!important;
+    font-weight:900!important;
+  }
+  /* Réafficher normalement le texte Wi-Fi */
+  .navActions #openWifi{
+    font-size:11px!important;
+  }
+  .navActions #openWifi:after{
+    content:none!important;
+  }
+  /* Barre de recherche sous les boutons */
+  .searchBox{
+    order:3!important;
+    grid-column:1/-1!important;
+    width:100%!important;
+  }
+  /* Décalage du menu sticky adapté à la nouvelle hauteur */
+  .stickyNav.compactNav{
+    top:157px!important;
+  }
 }
 </style>
 
