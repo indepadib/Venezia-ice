@@ -285,7 +285,38 @@ body:before{opacity:.18!important;background-image:linear-gradient(135deg,rgba(2
  <div class="adminCard"><h4>Article</h4><div class="formGrid"><div><label>Univers</label><select id="adminSection"></select></div><div><label>Catégorie</label><select id="adminCategory"></select></div><div><label>Nom</label><input id="itemName"></div><div><label>Prix</label><input id="itemPrice" type="number" step="0.01"></div><div style="grid-column:1/-1"><label>Photo URL</label><input id="itemImage"></div><div style="grid-column:1/-1"><label>Description</label><textarea id="itemDescription"></textarea></div><div><label>Badge</label><input id="itemBadge" placeholder="Top ventes, Signature..."></div><div><label>Contient</label><input id="itemContains" placeholder="Lait, fruits, café..."></div><div style="grid-column:1/-1"><label>Composition / fiche technique</label><textarea id="itemComposition"></textarea></div><div><label>Allergènes</label><input id="itemAllergens"></div><div><label>Notes internes</label><input id="itemNotes"></div></div><div class="adminActions"><button class="pillBtn active" id="saveItem">Enregistrer</button><button class="pillBtn" id="newItem">Nouvel article</button><button class="pillBtn danger" id="deleteItem">Supprimer</button></div></div>
  <div class="adminCard"><h4>Importer / Exporter JSON</h4><textarea id="jsonArea" style="min-height:150px"></textarea><div class="adminActions"><button class="pillBtn" id="exportJson">Exporter</button><button class="pillBtn" id="importJson">Importer</button><button class="pillBtn danger" id="resetCatalog">Reset catalogue</button></div></div>
  <div class="adminCard"><h4>Code backoffice</h4><div class="formGrid"><input id="newAdminCode" placeholder="Nouveau code"><input id="confirmAdminCode" placeholder="Confirmer"></div><div class="adminActions"><button class="pillBtn" id="changeCode">Changer le code</button></div></div>
- <div class="adminCard"><h4>Catalogue</h4><div id="adminList"></div></div>
+ <div class="adminCard">
+  <h4>Rechercher et modifier un article</h4>
+
+  <div class="formGrid" style="margin-bottom:14px">
+    <div style="grid-column:1/-1">
+      <label>Recherche</label>
+      <input
+        id="adminSearch"
+        type="search"
+        placeholder="Nom de l’article, café, latte, glace..."
+      >
+    </div>
+
+    <div>
+      <label>Filtrer par univers</label>
+      <select id="adminFilterSection">
+        <option value="">Tous les univers</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Filtrer par catégorie</label>
+      <select id="adminFilterCategory">
+        <option value="">Toutes les catégories</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="adminResultCount" style="margin-bottom:10px;color:var(--soft);font-size:13px"></div>
+
+  <div id="adminList"></div>
+</div>
 </div></aside><div class="toast" id="toast"></div>
 
 
@@ -369,33 +400,333 @@ function renderNav(){
 }
 function card(e){const attrs=[]; if(e.item.badge)attrs.push(e.item.badge); if(e.item.tech?.allergens)attrs.push('Allergènes'); if(e.item.tech?.composition)attrs.push('Fiche'); const top=(e.item.badge||'').toLowerCase().includes('top'); return `<article class="card"><div class="photo"><img src="${e.item.image}" alt="${e.item.name.replaceAll('"','&quot;')}" loading="lazy"><div class="badges">${top?'<span class="badge gold">Top ventes</span>':''}${e.item.badge&&!top?`<span class="badge">${e.item.badge}</span>`:''}</div></div><div class="cardBody"><div class="cardTop"><h4>${e.item.name}</h4><div class="price">${money(e.item.price)}</div></div><p class="desc">${e.item.description||e.cat.name+' · '+e.sec.name}</p><div class="cardFooter"><button class="detailBtn" data-detail="${e.item.id}">Voir la fiche</button><div class="tinyAttrs">${attrs.slice(0,2).map(a=>`<span class="tiny">${a}</span>`).join('')}</div></div></div></article>`}
 function renderContent(){const entries=filteredEntries(); const statItems=$('#statItems'),statCats=$('#statCats'); if(statItems)statItems.textContent=flat().length; if(statCats)statCats.textContent=state.sections.reduce((n,s)=>n+s.categories.length,0); $('#resultTitle').textContent=query?`Recherche “${query}”`:(activeCategory?(activeSec().categories.find(c=>c.id===activeCategory)?.name||'Catégorie'):(activeSec()?.name||'Toute la carte')); $('#resultSub').textContent=`${entries.length} article${entries.length>1?'s':''}`; if(!entries.length){$('#content').innerHTML='<div class="empty">Aucun article trouvé. Essaie un autre mot ou réinitialise les filtres.</div>';return} if(query||activeCategory||activeFilter!=='all'){$('#content').innerHTML=`<section class="categorySection ${entries.length<=2?'fewItems':''}"><div class="catHead"><h3>${activeFilter!=='all'?'Sélection':'Résultats'}</h3><span></span></div><div class="grid">${entries.map(card).join('')}</div></section>`;return} let sec=activeSec(); $('#content').innerHTML=sec.categories.map(cat=>`<section class="categorySection ${cat.items.length<=2?'fewItems':''}" id="cat-${cat.id}"><div class="catHead"><h3>${cat.name}</h3><span></span></div><div class="grid">${cat.items.map((item,i)=>card({sec,cat,item,i})).join('')}</div></section>`).join('')}
-function render(){renderNav();renderContent();renderCravings();renderAdminOptions();renderAdminList();save()}
+function render() {
+  renderNav();
+  renderContent();
+  renderCravings();
+  renderAdminOptions();
+  renderAdminFilters();
+  renderAdminList();
+  save();
+}
 function findItem(id){for(const sec of state.sections)for(const cat of sec.categories)for(const item of cat.items)if(item.id===id)return {sec,cat,item}}
 function openDetail(id){const e=findItem(id); if(!e)return; const t=e.item.tech||{}; $('#detailSheet').innerHTML=`<div class="detailGrid"><div class="detailImg"><img src="${e.item.image}" alt="${e.item.name}"></div><div class="detailContent"><button class="closeX" onclick="closeDetail()">×</button><span class="eyebrow">${e.sec.name} · ${e.cat.name}</span><h2>${e.item.name}</h2><div class="detailPrice">${money(e.item.price)}</div><p style="color:var(--muted);line-height:1.65">${e.item.description||'Article Venezia préparé selon la carte.'}</p><div class="techBox"><div class="techLine"><b>Composition</b><span>${t.composition||'Composition à compléter dans le backoffice.'}</span></div><div class="techLine"><b>Contient</b><span>${t.contains||'À compléter'}</span></div><div class="techLine"><b>Allergènes</b><span>${t.allergens||'Demander confirmation au personnel.'}</span></div>${t.notes?`<div class="techLine"><b>Notes</b><span>${t.notes}</span></div>`:''}</div></div></div>`; $('#detailModal').classList.add('open')}
 function closeDetail(){$('#detailModal').classList.remove('open')} window.closeDetail=closeDetail;
 async function sha256(text){const enc=new TextEncoder().encode(text);const hash=await crypto.subtle.digest('SHA-256',enc);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function secret(){tap++; clearTimeout(tapTimer); tapTimer=setTimeout(()=>tap=0,1000); if(tap>=4){tap=0;$('#adminLock').classList.add('open');setTimeout(()=>$('#adminCode').focus(),50)}}
 async function unlock(){if(await sha256($('#adminCode').value)===currentHash){$('#adminLock').classList.remove('open');$('#adminPanel').classList.add('open');$('#adminCode').value=''}else toast('Code incorrect')}
-function renderAdminOptions(){$('#adminSection').innerHTML=state.sections.map(s=>`<option value="${s.id}">${s.name}</option>`).join(''); $('#adminSection').value=$('#adminSection').value||activeSection; let sec=state.sections.find(s=>s.id===$('#adminSection').value)||state.sections[0]; $('#adminCategory').innerHTML=(sec.categories||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
-function renderAdminList(){
-  const items = flat();
+function renderAdminOptions(sectionId = null, categoryId = null) {
+  const sectionSelect = $('#adminSection');
+  const categorySelect = $('#adminCategory');
 
-  $('#adminList').innerHTML = items.map(e => `
-    <div class="listItem" data-load="${e.item.id}">
-      <img src="${e.item.image}" alt="">
-      <div>
-        <b>${e.item.name}</b><br>
-        <small style="color:var(--soft)">
-          ${e.sec.name} · ${e.cat.name} · ${money(e.item.price)}
-        </small>
-      </div>
-      <button data-load="${e.item.id}">Charger</button>
-    </div>
-  `).join('');
+  const wantedSection =
+    sectionId ||
+    sectionSelect.value ||
+    state.sections[0]?.id ||
+    '';
+
+  sectionSelect.innerHTML = state.sections
+    .map(section => `
+      <option value="${section.id}">
+        ${section.name}
+      </option>
+    `)
+    .join('');
+
+  const existingSection = state.sections.find(
+    section => section.id === wantedSection
+  );
+
+  const selectedSection = existingSection || state.sections[0];
+
+  if (!selectedSection) {
+    categorySelect.innerHTML = '';
+    return;
+  }
+
+  sectionSelect.value = selectedSection.id;
+
+  categorySelect.innerHTML = (selectedSection.categories || [])
+    .map(category => `
+      <option value="${category.id}">
+        ${category.name}
+      </option>
+    `)
+    .join('');
+
+  const categoryExists = selectedSection.categories?.some(
+    category => category.id === categoryId
+  );
+
+  if (categoryExists) {
+    categorySelect.value = categoryId;
+  } else if (selectedSection.categories?.length) {
+    categorySelect.value = selectedSection.categories[0].id;
+  }
 }
-function fill(id){const e=findItem(id); if(!e)return; selectedItemId=id; $('#adminSection').value=e.sec.id; renderAdminOptions(); $('#adminCategory').value=e.cat.id; $('#itemName').value=e.item.name||''; $('#itemPrice').value=e.item.price||''; $('#itemImage').value=e.item.image||''; $('#itemDescription').value=e.item.description||''; $('#itemBadge').value=e.item.badge||''; $('#itemContains').value=e.item.tech?.contains||''; $('#itemComposition').value=e.item.tech?.composition||''; $('#itemAllergens').value=e.item.tech?.allergens||''; $('#itemNotes').value=e.item.tech?.notes||''}
+
+function renderAdminFilters() {
+  const sectionFilter = $('#adminFilterSection');
+  const categoryFilter = $('#adminFilterCategory');
+
+  if (!sectionFilter || !categoryFilter) return;
+
+  const currentSection = sectionFilter.value;
+  const currentCategory = categoryFilter.value;
+
+  sectionFilter.innerHTML = `
+    <option value="">Tous les univers</option>
+    ${state.sections.map(section => `
+      <option value="${section.id}">
+        ${section.name}
+      </option>
+    `).join('')}
+  `;
+
+  if (state.sections.some(section => section.id === currentSection)) {
+    sectionFilter.value = currentSection;
+  }
+
+  const selectedSectionId = sectionFilter.value;
+
+  let categories = [];
+
+  if (selectedSectionId) {
+    const section = state.sections.find(
+      section => section.id === selectedSectionId
+    );
+
+    categories = (section?.categories || []).map(category => ({
+      ...category,
+      sectionName: section.name
+    }));
+  } else {
+    categories = state.sections.flatMap(section =>
+      (section.categories || []).map(category => ({
+        ...category,
+        sectionName: section.name
+      }))
+    );
+  }
+
+  categoryFilter.innerHTML = `
+    <option value="">Toutes les catégories</option>
+    ${categories.map(category => `
+      <option value="${category.id}">
+        ${selectedSectionId
+          ? category.name
+          : `${category.sectionName} — ${category.name}`
+        }
+      </option>
+    `).join('')}
+  `;
+
+  if (categories.some(category => category.id === currentCategory)) {
+    categoryFilter.value = currentCategory;
+  }
+}
+
+function renderAdminList() {
+  const searchValue = String($('#adminSearch')?.value || '')
+    .trim()
+    .toLowerCase();
+
+  const sectionValue = $('#adminFilterSection')?.value || '';
+  const categoryValue = $('#adminFilterCategory')?.value || '';
+
+  const items = flat().filter(entry => {
+    const searchableText = [
+      entry.item.name,
+      entry.item.description,
+      entry.item.badge,
+      entry.item.tech?.contains,
+      entry.sec.name,
+      entry.cat.name
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    const matchesSearch =
+      !searchValue || searchableText.includes(searchValue);
+
+    const matchesSection =
+      !sectionValue || entry.sec.id === sectionValue;
+
+    const matchesCategory =
+      !categoryValue || entry.cat.id === categoryValue;
+
+    return matchesSearch && matchesSection && matchesCategory;
+  });
+
+  const resultCount = $('#adminResultCount');
+
+  if (resultCount) {
+    resultCount.textContent =
+      `${items.length} article${items.length > 1 ? 's' : ''} trouvé${items.length > 1 ? 's' : ''}`;
+  }
+
+  $('#adminList').innerHTML = items.length
+    ? items.map(entry => `
+        <div
+          class="listItem"
+          data-load="${entry.item.id}"
+          style="cursor:pointer"
+        >
+          <img
+            src="${entry.item.image}"
+            alt="${entry.item.name}"
+            loading="lazy"
+          >
+
+          <div style="min-width:0">
+            <b>${entry.item.name}</b>
+
+            <br>
+
+            <small style="color:var(--soft)">
+              ${entry.sec.name}
+              · ${entry.cat.name}
+              · ${money(entry.item.price)}
+            </small>
+          </div>
+
+          <button
+            type="button"
+            data-load="${entry.item.id}"
+          >
+            Modifier
+          </button>
+        </div>
+      `).join('')
+    : `
+      <div style="padding:20px;text-align:center;color:var(--soft)">
+        Aucun article trouvé.
+      </div>
+    `;
+}
+
+function fill(id) {
+  const entry = findItem(id);
+
+  if (!entry) {
+    toast('Article introuvable');
+    return;
+  }
+
+  selectedItemId = id;
+
+  /*
+   * On transmet directement le véritable univers
+   * et la véritable catégorie de l’article.
+   */
+  renderAdminOptions(entry.sec.id, entry.cat.id);
+
+  $('#itemName').value = entry.item.name || '';
+  $('#itemPrice').value = entry.item.price ?? '';
+  $('#itemImage').value = entry.item.image || '';
+  $('#itemDescription').value = entry.item.description || '';
+  $('#itemBadge').value = entry.item.badge || '';
+  $('#itemContains').value = entry.item.tech?.contains || '';
+  $('#itemComposition').value = entry.item.tech?.composition || '';
+  $('#itemAllergens').value = entry.item.tech?.allergens || '';
+  $('#itemNotes').value = entry.item.tech?.notes || '';
+
+  /*
+   * Remonte automatiquement vers le formulaire.
+   */
+  $('#adminSection').onchange = () => {
+  renderAdminOptions($('#adminSection').value, null);
+};
+  $('#adminSearch').addEventListener('input', renderAdminList);
+
+$('#adminFilterSection').addEventListener('change', () => {
+  $('#adminFilterCategory').value = '';
+  renderAdminFilters();
+  renderAdminList();
+});
+
+$('#adminFilterCategory').addEventListener('change', renderAdminList);
+}
 function clearForm(){selectedItemId=null; ['itemName','itemPrice','itemImage','itemDescription','itemBadge','itemContains','itemComposition','itemAllergens','itemNotes'].forEach(id=>$('#'+id).value='')}
-function saveItem(){let sec=state.sections.find(s=>s.id===$('#adminSection').value); let cat=sec?.categories.find(c=>c.id===$('#adminCategory').value); if(!cat)return toast('Choisis une catégorie'); let item={id:selectedItemId||`${cat.id}-${slug($('#itemName').value)}-${Date.now().toString(36)}`, name:$('#itemName').value.trim(), price:Number($('#itemPrice').value||0), image:$('#itemImage').value.trim(), description:$('#itemDescription').value.trim(), badge:$('#itemBadge').value.trim(), tech:{contains:$('#itemContains').value.trim(),composition:$('#itemComposition').value.trim(),allergens:$('#itemAllergens').value.trim(),notes:$('#itemNotes').value.trim()}}; if(!item.name)return toast('Nom obligatoire'); item.image=imgFor(item,cat,sec,0); let idx=cat.items.findIndex(i=>i.id===item.id); if(idx>=0)cat.items[idx]=item; else cat.items.unshift(item); normalize(); render(); toast('Article enregistré')}
+function saveItem() {
+  const targetSection = state.sections.find(
+    section => section.id === $('#adminSection').value
+  );
+
+  const targetCategory = targetSection?.categories.find(
+    category => category.id === $('#adminCategory').value
+  );
+
+  if (!targetSection) {
+    toast('Choisis un univers');
+    return;
+  }
+
+  if (!targetCategory) {
+    toast('Choisis une catégorie');
+    return;
+  }
+
+  const itemName = $('#itemName').value.trim();
+
+  if (!itemName) {
+    toast('Nom obligatoire');
+    return;
+  }
+
+  const itemId =
+    selectedItemId ||
+    `${targetCategory.id}-${slug(itemName)}-${Date.now().toString(36)}`;
+
+  const item = {
+    id: itemId,
+    name: itemName,
+    price: Number($('#itemPrice').value || 0),
+    image: $('#itemImage').value.trim(),
+    description: $('#itemDescription').value.trim(),
+    badge: $('#itemBadge').value.trim(),
+
+    tech: {
+      contains: $('#itemContains').value.trim(),
+      composition: $('#itemComposition').value.trim(),
+      allergens: $('#itemAllergens').value.trim(),
+      notes: $('#itemNotes').value.trim()
+    }
+  };
+
+  item.image = imgFor(item, targetCategory, targetSection, 0);
+
+  /*
+   * Suppression de l’ancien emplacement.
+   * Indispensable si l’univers ou la catégorie a changé.
+   */
+  state.sections.forEach(section => {
+    section.categories.forEach(category => {
+      category.items = category.items.filter(
+        existingItem => existingItem.id !== itemId
+      );
+    });
+  });
+
+  /*
+   * Ajout dans la catégorie actuellement sélectionnée.
+   */
+  targetCategory.items.unshift(item);
+
+  selectedItemId = itemId;
+
+  normalize();
+  render();
+
+  /*
+   * Recharge l’article après le rendu pour conserver
+   * le bon univers et la bonne catégorie à l’écran.
+   */
+  fill(itemId);
+
+  toast('Article enregistré');
+}
 function delItem(){if(!selectedItemId)return toast('Charge un article'); state.sections.forEach(s=>s.categories.forEach(c=>{let i=c.items.findIndex(x=>x.id===selectedItemId); if(i>=0)c.items.splice(i,1)})); clearForm(); render(); toast('Article supprimé')}
 function exportJson(){$('#jsonArea').value=JSON.stringify(state,null,2);$('#jsonArea').select()} function importJson(){try{state=JSON.parse($('#jsonArea').value);normalize();activeSection=state.sections[0]?.id||'';render();toast('JSON importé')}catch{toast('JSON invalide')}}
 async function changeCode(){let a=$('#newAdminCode').value,b=$('#confirmAdminCode').value;if(!a||a.length<6)return toast('6 caractères minimum'); if(a!==b)return toast('Confirmation différente'); currentHash=await sha256(a); localStorage.setItem(HASH_KEY,currentHash); $('#newAdminCode').value=$('#confirmAdminCode').value=''; toast('Code changé')}
