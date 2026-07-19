@@ -377,7 +377,22 @@ async function sha256(text){const enc=new TextEncoder().encode(text);const hash=
 function secret(){tap++; clearTimeout(tapTimer); tapTimer=setTimeout(()=>tap=0,1000); if(tap>=4){tap=0;$('#adminLock').classList.add('open');setTimeout(()=>$('#adminCode').focus(),50)}}
 async function unlock(){if(await sha256($('#adminCode').value)===currentHash){$('#adminLock').classList.remove('open');$('#adminPanel').classList.add('open');$('#adminCode').value=''}else toast('Code incorrect')}
 function renderAdminOptions(){$('#adminSection').innerHTML=state.sections.map(s=>`<option value="${s.id}">${s.name}</option>`).join(''); $('#adminSection').value=$('#adminSection').value||activeSection; let sec=state.sections.find(s=>s.id===$('#adminSection').value)||state.sections[0]; $('#adminCategory').innerHTML=(sec.categories||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
-function renderAdminList(){$('#adminList').innerHTML=flat().slice(0,80).map(e=>`<div class="listItem" data-load="${e.item.id}"><img src="${e.item.image}"><div><b>${e.item.name}</b><br><small style="color:var(--soft)">${e.cat.name} · ${money(e.item.price)}</small></div><button data-load="${e.item.id}">Charger</button></div>`).join('')}
+function renderAdminList(){
+  const items = flat();
+
+  $('#adminList').innerHTML = items.map(e => `
+    <div class="listItem" data-load="${e.item.id}">
+      <img src="${e.item.image}" alt="">
+      <div>
+        <b>${e.item.name}</b><br>
+        <small style="color:var(--soft)">
+          ${e.sec.name} · ${e.cat.name} · ${money(e.item.price)}
+        </small>
+      </div>
+      <button data-load="${e.item.id}">Charger</button>
+    </div>
+  `).join('');
+}
 function fill(id){const e=findItem(id); if(!e)return; selectedItemId=id; $('#adminSection').value=e.sec.id; renderAdminOptions(); $('#adminCategory').value=e.cat.id; $('#itemName').value=e.item.name||''; $('#itemPrice').value=e.item.price||''; $('#itemImage').value=e.item.image||''; $('#itemDescription').value=e.item.description||''; $('#itemBadge').value=e.item.badge||''; $('#itemContains').value=e.item.tech?.contains||''; $('#itemComposition').value=e.item.tech?.composition||''; $('#itemAllergens').value=e.item.tech?.allergens||''; $('#itemNotes').value=e.item.tech?.notes||''}
 function clearForm(){selectedItemId=null; ['itemName','itemPrice','itemImage','itemDescription','itemBadge','itemContains','itemComposition','itemAllergens','itemNotes'].forEach(id=>$('#'+id).value='')}
 function saveItem(){let sec=state.sections.find(s=>s.id===$('#adminSection').value); let cat=sec?.categories.find(c=>c.id===$('#adminCategory').value); if(!cat)return toast('Choisis une catégorie'); let item={id:selectedItemId||`${cat.id}-${slug($('#itemName').value)}-${Date.now().toString(36)}`, name:$('#itemName').value.trim(), price:Number($('#itemPrice').value||0), image:$('#itemImage').value.trim(), description:$('#itemDescription').value.trim(), badge:$('#itemBadge').value.trim(), tech:{contains:$('#itemContains').value.trim(),composition:$('#itemComposition').value.trim(),allergens:$('#itemAllergens').value.trim(),notes:$('#itemNotes').value.trim()}}; if(!item.name)return toast('Nom obligatoire'); item.image=imgFor(item,cat,sec,0); let idx=cat.items.findIndex(i=>i.id===item.id); if(idx>=0)cat.items[idx]=item; else cat.items.unshift(item); normalize(); render(); toast('Article enregistré')}
