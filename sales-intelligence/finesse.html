@@ -1,0 +1,38 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Venezia Ice — Analyse de précision</title><link rel="stylesheet" href="./insights.css?v=5"><style>
+.fineTop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:15px 17px;background:#fff;border:1px solid #e7e4ee;border-radius:14px;margin:14px 0 20px}
+.fineTop label{display:flex;flex-direction:column;gap:3px;flex:1 1 135px;font-size:10px;font-weight:800;color:#8a91a6;letter-spacing:.4px}
+.fineTop input,.fineTop select{min-width:0;width:100%;padding:10px;border-radius:9px;border:1px solid #e6e1ee;background:#fff;color:#273554;font-size:12px}
+.fineTop .apply{padding:10px 16px;border:0;border-radius:9px;background:#7558ce;color:white;font-weight:800;font-size:12px;align-self:end}
+.fineTop .ghost{background:#eeeafb;color:#6945bf}
+.statnote{padding:12px 15px;background:#f1edff;color:#69549b;border-radius:10px;font-size:11px;margin:11px 0}
+.fineGrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px;margin:15px 0}
+.fineGrid .c8{grid-column:span 8}.fineGrid .c7{grid-column:span 7}.fineGrid .c6{grid-column:span 6}.fineGrid .c5{grid-column:span 5}.fineGrid .c4{grid-column:span 4}.fineGrid .c12{grid-column:span 12}
+.metricCards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}
+.miniSelect{display:inline-block;max-width:240px;border:1px solid #e9e2f2;background:#fff;color:#6244b2;padding:8px;border-radius:9px;font-weight:800}
+.edge{background:#faf7ff;border:1px solid #ece2fb;border-radius:12px;padding:17px;margin-bottom:11px}
+.edge .topic{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#816cb5;font-weight:900}
+.edge h3{font-size:14px;margin:8px 0 7px}
+.edge p{font-size:12px;color:#8289a5;margin:0}
+.edge .evidence{font-size:11px;color:#596780;margin-top:9px}
+.edge .ctaBtn{margin-top:11px;padding:8px 11px;border:0;border-radius:8px;background:#765ad2;color:white;font-size:11px;font-weight:800}
+.toolrow{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;margin:8px 0 14px}
+.toolrow button{padding:8px 12px;border:1px solid #e9e4f2;border-radius:8px;background:#fff;color:#6546bf;font-size:11px;font-weight:800}
+.hourMatrix{display:grid;grid-template-columns:115px repeat(24,minmax(20px,1fr));gap:3px;min-width:770px}
+.hourMatrix span{font-size:9px;color:#9da5b7;text-align:center;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.hourMatrix .hcell{border-radius:4px;min-height:24px;background:#f3effb}
+.mixMarker{display:inline-block;font-size:10px;border-radius:5px;padding:3px 7px;background:#edf9f5;color:#188466;font-weight:800}
+.mixMarker.low{background:#fff0f3;color:#c95367}
+.qualitybox{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qualitybox div{padding:13px;border:1px solid #ece6f1;border-radius:10px;font-size:11px;color:#78839d}
+.qualitybox b{display:block;font-size:23px;color:#232e49}
+.fineGrid .panel{overflow:hidden}
+.fineEmpty{padding:68px 24px;text-align:center;background:#fff;border:1px solid #ece7f2;border-radius:16px}
+.fineEmpty h2{font-size:28px;letter-spacing:-.7px}
+.fineEmpty p{max-width:620px;margin:12px auto 22px;color:#8892a9}
+.fineEmpty .btn{display:inline-flex}
+@media(max-width:1030px){.fineGrid .c8,.fineGrid .c7,.fineGrid .c5,.fineGrid .c4{grid-column:span 6}}@media(max-width:740px){.fineGrid .c8,.fineGrid .c7,.fineGrid .c6,.fineGrid .c5,.fineGrid .c4,.fineGrid .c12{grid-column:span 12}.metricCards{grid-template-columns:repeat(2,1fr)}.fineTop label{flex-basis:45%}.fineTop .apply{flex:1}.fineEmpty{padding:35px 14px}.hourMatrix{min-width:720px}}
+</style></head><body><div class="shell"><aside class="sidebar"><div class="brand"><div class="brandicon">VI</div><div><div class="brandname">Venezia Ice</div><div class="brandtag">Precision Intelligence</div></div></div><div class="navlabel">ANALYSE À LA FINESSE</div><nav class="navlist" id="fineNav">
+<button class="navbutton active" data-view="command">◈ Command Center</button><button class="navbutton" data-view="products">★ Produits & flops</button><button class="navbutton" data-view="time">◷ Heures & jours</button><button class="navbutton" data-view="pulse">↗ Weekly Pulse</button><button class="navbutton" data-view="benchmark">▤ Benchmark magasins</button><button class="navbutton" data-view="opportunities">◎ Opportunités</button><button class="navbutton" data-view="actions">✓ Plans d'action</button><button class="navbutton" data-view="quality">◇ Qualité des données</button></nav><div class="sidebarbottom"><b>Analyse locale confidentielle</b><br>Les données restent dans le navigateur. Sauvegardez vos imports régulièrement.<a href="./index.html">← Synthèse Direction</a><a href="./advanced.html">↑ Imports CSV & sauvegardes</a></div></aside><main class="workspace"><header class="topbar"><div class="crumb">VENEZIA ICE &nbsp;/&nbsp; <b>ANALYSE DE PRÉCISION</b></div><div class="topright"><span class="securetag" id="dataStatus">● Stockage local</span><span class="datepill" id="dateStatus">—</span></div></header>
+<div class="heading"><div><h1 id="viewTitle">Command Center</h1><p id="viewSubtitle">Chaque écart doit aboutir à une décision vérifiable.</p></div><a class="btn secondary" href="./advanced.html">+ Importer CSV</a></div>
+<div id="filters" class="fineTop" style="display:none"><label>Magasin<select id="fStore"><option value="">Tout le réseau</option></select></label><label>Famille<select id="fFamily"><option value="">Toutes les familles</option></select></label><label>Début<input type="date" id="fStart"></label><label>Fin<input type="date" id="fEnd"></label><button class="apply" id="fApply">Appliquer</button><button class="apply ghost" id="fReset">Réinitialiser</button></div>
+<div id="content" aria-live="polite"><div class="fineEmpty"><h2>Analyse en préparation…</h2></div></div><footer class="foot">Calculs à partir des lignes agrégées du CSV importé localement. CA = somme du « Prix de vente » enregistré ; quantités payées = lignes à prix positif. La marge n’est pas affichée lorsque les coûts sont incomplets. Les jours vendus ne constituent pas des jours d’ouverture vérifiés. <a href="./advanced.html">Gérer les imports</a></footer></main></div><script defer src="./finesse.js?v=1"></script></body></html>
