@@ -30,7 +30,7 @@ const ix={store:0,date:1,hour:2,family:3,category:4,product:5,rev:6,qty:7,paid:8
 function msg(text,type='info'){ $('#message').innerHTML=text?'<div class="'+(type==='warn'?'alert':'info')+'">'+esc(text)+'</div>':'';}
 function section(title,content,note=''){return '<div class="panel"><h2>'+esc(title)+'</h2>'+(note?'<p class="note">'+esc(note)+'</p>':'')+content+'</div>'}
 function card(label,num,hint){return '<div class="card"><span>'+esc(label)+'</span><strong>'+esc(num)+'</strong><small>'+esc(hint||'')+'</small></div>'}
-function tab(headers,rows){return '<div class="tablewrap"><table><thead><tr>'+headers.map((x,i)=>'<th'+(i&&/^(CA|Qté|Part|Évolution|€/|Rang|Jours)/.test(x)?' class="num"':'')+'>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'}
+function tab(headers,rows){return '<div class="tablewrap"><table><thead><tr>'+headers.map((x,i)=>'<th'+(i&&/^(CA|Qté|Part|Évolution|Rang|Jours)/.test(x)?' class="num"':'')+'>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'}
 function bars(items,formatter=money){const max=Math.max(1,...items.map(x=>Math.max(0,x[1])));return items.map(x=>'<div class="barrow"><span title="'+esc(x[0])+'">'+esc(x[0])+'</span><div class="track"><div class="fill" style="width:'+Math.max(0,100*x[1]/max).toFixed(2)+'%"></div></div><b style="text-align:right">'+esc(formatter(x[1]))+'</b></div>').join('')||'<p class="hint">Aucune donnée</p>'}
 function kv(rows,k,v){const m=new Map();rows.forEach(r=>m.set(r[k],(m.get(r[k])||0)+Number(r[v]||0)));return [...m.entries()].sort((a,b)=>b[1]-a[1])}
 function total(rows,k=ix.rev){return rows.reduce((a,r)=>a+(Number(r[k])||0),0)}
