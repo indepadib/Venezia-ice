@@ -187,17 +187,130 @@ function empty(){
  $("#filters").style.display="none";labels("Analyse de précision","Connectez une fois votre historique pour aller au produit, à l’heure, au magasin et à la semaine.");
  C.innerHTML='<div class="fineEmpty"><div class="eyebrow" style="color:#7658c8">VENEZIA ICE · PRÉCISION</div><h2>Une lecture à la finesse demande les lignes de vente.</h2><p>Le tableau de bord exécutif est préchargé avec une synthèse historique chiffrée. Pour approfondir les journées, heures, familles et produits de chaque magasin, importez <b>une seule fois</b> votre export CSV historique dans le module d’analyse avancée. Les rapports hebdomadaires enrichiront ensuite les calculs sans double comptage.</p><a class="btn" href="./advanced.html">Importer mon historique Venezia →</a><p style="font-size:11px;margin-top:20px">Vos ventes restent sur cet appareil, et ne sont pas publiées sur GitHub ou Netlify.</p></div>';
 }
-function view(name){M.tab=name;$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(!M.rows.length){empty();return}$("#filters").style.display="flex";const routes={command,products:productsPage,time:timePage,pulse:pulsePage,benchmark:benchmarkPage,opportunities:opportunitiesPage,actions:actionsPage,quality:qualityPage};try{routes[name]()}catch(e){console.error(e);C.innerHTML='<div class="notice">Un calcul a échoué : '+escape(e.message)+'. Rechargez la page ; les données importées restent dans le navigateur.</div>'}}
+
+async function decryptPack(path,pass){
+ if(!crypto?.subtle)throw Error("La page doit être ouverte en HTTPS.");
+ const r=await fetch(path,{cache:"force-cache"});if(!r.ok)throw Error("Impossible de charger le jeu de données chiffré (HTTP "+r.status+").");
+ const data=Uint8Array.from(atob((await r.text()).trim()),x=>x.charCodeAt(0)),salt=data.slice(0,16),iv=data.slice(16,28),cipher=data.slice(28);
+ const material=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),"PBKDF2",false,["deriveKey"]);
+ const k=await crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:250000,hash:"SHA-256"},material,{name:"AES-GCM",length:256},false,["decrypt"]);
+ const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv},k,cipher);
+ return JSON.parse(await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream("deflate"))).text());
+}
+function previewUnlock(error=""){
+ $("#filters").style.display="none";labels("Analyse de précision","L’historique est déjà disponible sous forme chiffrée.");
+ C.innerHTML='<div class="fineEmpty"><div class="eyebrow" style="color:#7555c9">VENEZIA ICE · ACCÈS AUX CHIFFRES</div><h2>Vos analyses détaillées sont préchargées.</h2><p>Les ventes historiques ont été préparées et chiffrées. Utilisez la même clé privée que dans la Vue Direction pour explorer immédiatement les performances par magasin, horaire, famille et semaine. Aucun CSV à importer pour cette première lecture.</p><form id="previewPass"><input class="control" type="password" id="previewKey" required autocomplete="off" placeholder="Clé privée de déchiffrement" style="width:min(400px,100%);padding:12px"><button class="btn" type="submit" style="margin:8px">Afficher mes données →</button></form><p id="keyErr" style="font-size:11px;color:#d55270">'+escape(error)+'</p></div>';
+ $("#previewPass").onsubmit=async e=>{e.preventDefault();$("#keyErr").textContent="Déchiffrement…";let key=$("#previewKey").value.trim();try{await loadPreview(key);sessionStorage.setItem("venezia_session",key);view("command")}catch(err){$("#keyErr").textContent="Impossible de déchiffrer : "+err.message}};
+}
+async function loadPreview(key){
+ const [fine,summary]=await Promise.all([decryptPack("./secure-finesse.enc",key),decryptPack("./secure-summary.enc",key)]);
+ if(fine.version!==1||summary.v!==5||fine.stores.length!==summary.stores.length)throw Error("Format historique inattendu");
+ M.preview={fine,summary};M.min="2026-06-01";M.max="2026-10-12";M.start=M.min;M.end=M.max;M.store="";M.family="";
+ M.unfiltered={stores:new Map(summary.stores.map(x=>[x[0],x[1]]))};
+ $("#fStore").innerHTML='<option value="">Tout le réseau</option>'+fine.stores.map(s=>'<option>'+escape(s)+'</option>').join("");
+ $("#fFamily").innerHTML='<option value="">Toutes les familles</option>';$("#fFamily").disabled=true;$("#fFamily").title="Filtre famille disponible après import de détail";
+ $("#fStart").value=M.min;$("#fEnd").value=M.max;$("#fStore").value="";
+ $("#dataStatus").textContent="● Historique chiffré chargé";$("#dateStatus").textContent="01/06 → 12/10/2026";$("#filters").style.display="flex";
+}
+function previewStoreIndex(){return M.preview?.fine?.stores?.indexOf(M.store)??-1}
+function pRows(source,idx=0){const a=M.preview.fine[source]||[],k=previewStoreIndex();return a.filter(x=>k<0||x[idx]===k)}
+function pDates(){return pRows("daily").map(x=>[shift(M.preview.fine.start,x[1]),x[2],x[3],M.preview.fine.stores[x[0]]]).filter(x=>x[0]>=M.start&&x[0]<=M.end)}
+function pStoreTotal(){return pDates().reduce((a,x)=>a+x[1],0)}
+function pWk(){const k=previewStoreIndex(),a=M.preview.summary.weeklyStore;return [a.filter(x=>x[0]===0&&(k<0||x[1]===M.store)).reduce((t,x)=>t+x[2],0),a.filter(x=>x[0]===1&&(k<0||x[1]===M.store)).reduce((t,x)=>t+x[2],0)]}
+function pProds(){const d=M.preview.summary;return M.store?d.storeProducts.filter(x=>x[0]===M.store).map(x=>[x[1],x[2],x[3]]):d.globalProducts}
+function pFamilies(){const d=M.preview.summary;return M.store?d.storeFamily.filter(x=>x[0]===M.store).map(x=>[x[1],x[2]]):d.familyGlobal}
+function previewNotice(){return '<div class="notice"><b>Historique préchargé :</b> CA, jours, heures, catégories et évolution issus de vos données réelles. Les tops produits préchargés sont limités aux 24 premiers du réseau et aux 8 premiers par magasin. Les analyses sur tous les produits, le filtre famille et les futurs CSV sont disponibles après import du rapport détaillé via <a href="./advanced.html" style="color:#6b4ac2;font-weight:800">Imports CSV</a>.</div>'}
+function pHour(){const k=previewStoreIndex();return k<0?M.preview.summary.hourly.map(x=>[Number(x[0]),x[1]]):pRows("storeHour").map(x=>[Number(x[1]),x[2]])}
+function pBarsHour(){const raw=new Map(pHour()),max=Math.max(1,...raw.values());return '<div class="hourchart">'+Array.from({length:24},(_,h)=>{const v=raw.get(h)||0;return '<div class="houritem" title="'+h+"h : "+mad(v)+'"><div class="hourcolumn" style="height:'+Math.max(2,v/max*160)+'px"></div><small>'+(h%3===0?h+"h":"")+'</small></div>'}).join("")+'</div>'}
+function pWeekCategory(key,storeSpecific=true){
+ const d=M.preview.summary;const k=previewStoreIndex();let out;
+ if(k<0||!storeSpecific){out=d[key==="family"?"weeklyFamily":"weeklyProduct"].map(x=>[x[0],x[1],x[2]])}
+ else {out=pRows(key==="family"?"storeWeeklyFamily":"storeWeeklyProduct").map(x=>[x[1],x[2],x[3]])}
+ const old=new Map(out.filter(x=>x[0]===0).map(x=>[x[1],x[2]])),now=new Map(out.filter(x=>x[0]===1).map(x=>[x[1],x[2]]));
+ return [...new Set([...old.keys(),...now.keys()])].map(name=>({name,now:now.get(name)||0,was:old.get(name)||0})).sort((a,b)=>Math.abs(b.now-b.was)-Math.abs(a.now-a.was));
+}
+function previewOverview(){
+ labels("Command Center · précis","Chiffres historiques déjà intégrés : jours, magasins, familles, produits, semaine.");
+ const d=M.preview.summary,rows=pDates(),tot=pStoreTotal(),w=pWk(),f=pFamilies(),prods=pProds(),rev=[...new Map(rows.map(x=>[x[0],0]))];
+ const daily=new Map();for(const [date,sale] of rows)kv(daily,date,sale);
+ const weak=pWeekCategory("product").filter(x=>x.was>=1500&&x.now<x.was*.6).slice(0,3),best=f[0];
+ C.innerHTML=metricRow([metric("CA enregistré",mad(tot),"Période des dates sélectionnées"),metric("Magasins",num(M.store?1:d.stores.length),"Données Venezia","⌂"),metric("Ventes dernier 7j",mad(w[1]),"05–11 octobre","◈"),metric("Dynamique 7j",w[0]?pct(diff(w[1],w[0])):"—","Comparaison semaine précédente","↗")])+
+ '<div class="fineGrid"><div class="c7">'+panel("CA quotidien","Évolution filtrable jour par jour, tous magasins ou un magasin",compactTrend(daily),"134 JOURS")+'</div><div class="c5">'+panel("Les familles qui construisent le CA","Composition des ventes historiques du magasin",bars(f,9),"MIX")+'</div><div class="c6">'+panel("Tops produits","Produits les plus importants dans ce magasin",bars(prods.map(x=>[x[0],x[1]]),12),"TOP CA")+'</div><div class="c6">'+panel("Tops magasins","CA historique par magasin",bars(d.stores.map(x=>[x[0],x[1]]),10),"RÉSEAU")+'</div><div class="c12">'+panel("Trois signaux direction","Constats chiffrés avec points de contrôle",'<div class="insights">'+tile("MIX LEADER",best?.[0]||"—","Première famille sur le périmètre du magasin.")+tile("DERNIÈRE SEMAINE","Variation CA : "+(w[0]?pct(diff(w[1],w[0])):"sans base"),"5–11 octobre vs 28 septembre–4 octobre, sans attribution de cause.")+tile("PRODUITS EN RETRAIT",weak[0]?.name||"Aucun sur top visible",weak[0]?"Recul de "+mad(weak[0].now-weak[0].was)+" entre deux semaines. Vérifier stock, promo et exposition.":"Aucun signal significatif dans les produits préchargés.")+'</div>',"INSIGHTS")+'</div></div>'+previewNotice();
+}
+function previewStores(){
+ labels("Benchmark des magasins","Mêmes journées, mêmes métriques ; les mixes restent sur le total historique.");
+ const f=M.preview.fine;let grouped=new Map();
+ for(const [ix,days,ca] of f.daily){const st=f.stores[ix],date=shift(f.start,days);if(date<M.start||date>M.end||M.store&&st!==M.store)continue;let a=grouped.get(st);if(!a){a={rev:0,days:0};grouped.set(st,a)}a.rev+=ca;a.days++}
+ const rows=[...grouped].map(([name,x])=>({name,rev:x.rev,days:x.days,avg:x.rev/x.days})).sort((a,b)=>b.avg-a.avg);
+ const html=rows.map((x,i)=>'<tr><td>'+num(i+1)+'</td><td><b>'+escape(x.name)+'</b></td><td class="r">'+mad(x.rev)+'</td><td class="r">'+num(x.days)+'</td><td class="r">'+mad(x.avg)+'</td></tr>');
+ const wd=pRows("storeWeekday").map(x=>[dayNames[x[1]],x[2]]);
+ const wdmap=new Map();for(const [name,ca] of wd)kv(wdmap,name,ca);
+ C.innerHTML=metricRow([metric("Points analysés",num(rows.length),"Présence de ventes"),metric("CA sélection",mad(rows.reduce((a,x)=>a+x.rev,0)),"Période commune","↗"),metric("Meilleur CA par jour",mad(rows[0]?.avg||0),"Jours avec ventes seulement","★"),metric("Dernière semaine",mad(pWk()[1]),"Périmètre magasin","◷")])+
+ '<div class="fineGrid"><div class="c12">'+panel("Classement normalisé","Jours avec ventes observées, horaires réels à vérifier",table(["#","Magasin","CA","Jours vendus","CA / jour"],html),"BENCHMARK")+'</div><div class="c6">'+panel("Top catégories locales","Catégories historiques en CA",bars(pRows("storeCategory").map(x=>[x[1],x[2]]).sort((a,b)=>b[1]-a[1]),12),"CATÉGORIES")+'</div><div class="c6">'+panel("Jour de semaine : ventes","CA par jour de semaine, non normalisé par ouverture",bars(rank(wdmap),7),"MIX SEMAINE")+'</div></div>'+previewNotice();
+}
+function previewProducts(){
+ labels("Tops et signaux produits","Pour chaque magasin : tops historiques, quantité payée et reculs hebdomadaires.");
+ const p=pProds(),tot=M.store?M.preview.summary.stores.find(x=>x[0]===M.store)?.[1]:M.preview.summary.overall[0],week=pWeekCategory("product");
+ const leaders=p.map((x,i)=>'<tr><td>'+num(i+1)+'</td><td><b>'+escape(x[0])+'</b></td><td class="r">'+mad(x[1])+'</td><td class="r">'+num(x[2])+'</td><td class="r">'+pct(100*x[1]/Math.max(1,tot))+'</td></tr>');
+ const movements=week.slice(0,26).map(x=>'<tr><td><b>'+escape(x.name)+'</b></td><td class="r">'+mad(x.now)+'</td><td class="r">'+mad(x.was)+'</td><td class="r">'+arrow(diff(x.now,x.was))+'</td></tr>');
+ const parts=["Matin < 12h","12–18h","Après 18h"],topParts=pRows("topProductHour").filter(x=>p.some(z=>z[0]===x[1])).sort((a,b)=>b[3]-a[3]).slice(0,18).map(x=>'<tr><td>'+escape(M.preview.fine.stores[x[0]])+'</td><td>'+escape(x[1])+'</td><td>'+escape(parts[x[2]])+'</td><td class="r">'+mad(x[3])+'</td></tr>');
+ C.innerHTML=metricRow([metric("Leader",p[0]?.[0]||"—","Produit à plus gros CA","★"),metric("CA leader",mad(p[0]?.[1]||0),"Historique total","↗"),metric("Qté leader",num(p[0]?.[2]||0),"Lignes facturées > 0 DH","◈"),metric("Top 5 poids CA",pct(100*p.slice(0,5).reduce((a,x)=>a+x[1],0)/(tot||1)),"Concentration historique","◎")])+
+ '<div class="fineGrid"><div class="c7">'+panel("Tops produit : CA et quantité","La sélection de magasin modifie le ranking",table(["#","Produit","CA","Qté payée","Part CA"],leaders),"TOPS")+'</div><div class="c5">'+panel("Mouvements cette semaine","Top produits des deux dernières semaines",table(["Produit","CA récent","Précédent","Δ"],movements),"DYNAMIQUE")+'</div><div class="c12">'+panel("Produit × moment × magasin","Heures de consommation regroupées par moments de journée",table(["Magasin","Produit","Moment","CA"],topParts),"FINESSE JOURNÉE")+'</div></div>'+previewNotice();
+}
+function previewTime(){
+ labels("Heures × magasin","Comprendre les moments de vente sans attendre le prochain fichier.");
+ const hrs=pHour(),ordered=[...hrs].sort((a,b)=>b[1]-a[1]),days=pRows("storeWeekday").map(x=>[dayNames[x[1]],x[2]]),ymap=new Map();for(const [nm,ca] of days)kv(ymap,nm,ca);
+ const pieces=pRows("storeFamilyHour").reduce((m,x)=>{kv(m,x[1]+sep+x[2],x[3]);return m},new Map());
+ const parts=["Avant 12h","12–18h","Après 18h"],rows=rank(pieces).slice(0,24).map(x=>{let [fam,part]=x[0].split(sep);return '<tr><td>'+escape(fam)+'</td><td>'+escape(parts[Number(part)])+'</td><td class="r">'+mad(x[1])+'</td></tr>'});
+ C.innerHTML=metricRow([metric("Heure leader",String(ordered[0]?.[0]??"—")+"h",mad(ordered[0]?.[1]||0),"◷"),metric("CA avant 12h",mad(hrs.filter(x=>x[0]<12).reduce((a,x)=>a+x[1],0)),"Matin","↗"),metric("CA 12–18h",mad(hrs.filter(x=>x[0]>=12&&x[0]<18).reduce((a,x)=>a+x[1],0)),"Midi après-midi","◈"),metric("CA après 18h",mad(hrs.filter(x=>x[0]>=18).reduce((a,x)=>a+x[1],0)),"Soir","★")])+
+ '<div class="fineGrid"><div class="c8">'+panel("Répartition par heure","CA horaire de l’ensemble ou du magasin choisi",pBarsHour(),"24 HEURES")+'</div><div class="c4">'+panel("Top 10 créneaux","Moments les plus vendeurs",bars(ordered.map(x=>[x[0]+"h",x[1]]),10),"CRENEAUX")+'</div><div class="c6">'+panel("Famille × moment","Matrice CA par grandes plages horaires",table(["Famille","Créneau","CA"],rows),"CROISEMENT")+'</div><div class="c6">'+panel("Semaine × magasin","CA par jour de semaine du magasin",bars(rank(ymap),7),"JOURS")+'</div></div>'+previewNotice();
+}
+function previewPulse(){
+ labels("Weekly Pulse · local","Les plus gros changements par magasin, famille et produit.");
+ const w=pWk(),d=M.preview.summary,fs=pWeekCategory("family"),ps=pWeekCategory("product");
+ const wstore=d.weeklyStore,old=new Map(wstore.filter(x=>x[0]===0).map(x=>[x[1],x[2]])),now=new Map(wstore.filter(x=>x[0]===1).map(x=>[x[1],x[2]]));
+ const tr=x=>'<tr><td><b>'+escape(x.name)+'</b></td><td class="r">'+mad(x.now)+'</td><td class="r">'+mad(x.was)+'</td><td class="r">'+(x.now>=x.was?"+":"")+mad(x.now-x.was)+'</td><td class="r">'+arrow(diff(x.now,x.was))+'</td></tr>';
+ const stores=d.stores.filter(x=>!M.store||x[0]===M.store).map(x=>({name:x[0],now:now.get(x[0])||0,was:old.get(x[0])||0}));
+ C.innerHTML='<div class="statnote"><b>05–11 octobre 2026</b> versus <b>28 septembre–04 octobre 2026</b>. Les dates personnalisées ne modifient pas ce comparatif préchargé.</div>'+
+ metricRow([metric("CA semaine",mad(w[1]),"05–11 octobre"),metric("CA référence",mad(w[0]),"28 sept.–04 oct.","◷"),metric("Écart en DH",(w[1]>=w[0]?"+":"")+mad(w[1]-w[0]),"Changement de CA","↗"),metric("Croissance",w[0]?pct(diff(w[1],w[0])):"—","Même durée","◎")])+
+ '<div class="fineGrid"><div class="c12">'+panel("Évolution par magasin","Tous les sites Venezia",table(["Magasin","CA récent","CA précédent","Différence","Δ %"],stores.map(tr)),"NETWORK")+'</div><div class="c6">'+panel("Familles qui bougent","Classées par amplitude de variation",table(["Famille","CA récent","CA précédent","Écart","Δ %"],fs.slice(0,22).map(tr)),"FAMILLES")+'</div><div class="c6">'+panel("Produits qui bougent","Classement basé sur les meilleurs produits observés chaque semaine",table(["Produit","CA récent","CA précédent","Écart","Δ %"],ps.slice(0,24).map(tr)),"PRODUITS")+'</div></div>'+previewNotice();
+}
+function previewOpportunities(){
+ labels("Opportunités magasin","Lecture descriptive des écarts de mix : hypothèses à tester avec le terrain.");
+ const d=M.preview.summary,stores=d.stores.filter(x=>x[2]>=28&&x[1]>=100000&&(!M.store||x[0]===M.store)),result=[];
+ const byFamily=new Map(d.familyGlobal);
+ for(const [name,rev] of stores){for(const [fam,global] of byFamily){let local=d.storeFamily.find(x=>x[0]===name&&x[1]===fam)?.[2]||0,others=global-local,otherRev=d.overall[0]-rev,mix=local/rev,peer=others/otherRev;if(local>=3000&&peer>=.035&&mix/peer<.72){result.push({name,fam,mix,peer,gap:(peer-mix)*rev})}}}
+ result.sort((a,b)=>b.gap-a.gap);
+ const entries=result.slice(0,45).map(x=>'<tr><td><b>'+escape(x.name)+'</b></td><td>'+escape(x.fam)+'</td><td class="r">'+pct(x.mix*100)+'</td><td class="r">'+pct(x.peer*100)+'</td><td class="r">'+p1.format(x.mix/x.peer)+' ×</td><td><button class="btn previewAction" data-title="'+escape(x.name+" : vérifier le mix "+x.fam)+'" style="padding:6px 10px;font-size:10px">Tester</button></td></tr>');
+ C.innerHTML=metricRow([metric("Hypothèses mix",num(result.length),"Familles sous représentées","◎"),metric("Périmètre",num(stores.length),"Sites comparés","⌂"),metric("Dimension","Familles","Comparaison au reste du réseau","◈"),metric("Diagnostic","À confirmer","Disponibilité, format, saison","★")])+
+ '<div class="fineGrid"><div class="c12">'+panel("Sous-indexations de mix à investiguer","Part des familles dans le magasin vs les autres magasins",table(["Magasin","Famille","Mix local","Mix autres","Indice","Action"],entries),"EXPERTISE")+'</div></div>'+
+ '<div class="notice">Ces écarts ne constituent ni des flops confirmés ni du chiffre d’affaires additionnel garanti. Magasins touristiques, malls, saisonnalité et politique produits peuvent expliquer les différences. Une vraie comparaison de produits exige l’import transactionnel complet.</div>';
+ $(".previewAction").forEach(b=>b.onclick=()=>createAction(b.dataset.title));
+}
+function previewQuality(){
+ labels("Qualité de la source historique","Un diagnostic commercial est aussi solide que ses données.");
+ const d=M.preview.summary,f=M.preview.fine,imported=window._fineImports||[];
+ const value=d.overall[0],byStore=d.stores.reduce((n,x)=>n+x[1],0),byFam=d.familyGlobal.reduce((n,x)=>n+x[1],0),checks=[["Somme magasins",byStore],["Somme familles",byFam]];
+ const unusual=f.daily.map(x=>({store:f.stores[x[0]],date:shift(f.start,x[1]),rev:x[2]})).filter(x=>x.rev>=90000).sort((a,b)=>b.rev-a.rev).slice(0,12);
+ C.innerHTML=metricRow([metric("Enregistrements",num(d.overall[1]),"Lignes de vente source"),metric("CA réseau",mad(value),"Montant historique","↗"),metric("Quantités payées",num(d.overall[2]),"Prix > 0","◈"),metric("Lignes zéro DH",num(d.overall[3]),"Formules et cas à vérifier","◎")])+
+ '<div class="fineGrid"><div class="c6">'+panel("Contrôles des totaux","Arrondis des agrégations, tolérance 20 DH",table(["Recalcul","CA","Écart vs réseau"],checks.map(x=>'<tr><td>'+x[0]+'</td><td class="r">'+mad(x[1])+'</td><td class="r">'+(Math.abs(x[1]-value)<=20?'<span class="positive">OK</span>':'<span class="negative">'+mad(x[1]-value)+'</span>')+'</td></tr>')),"RÉCONCILIATION")+'</div><div class="c6">'+panel("Import complet","Le prochain niveau de fiabilité",tile("COÛTS", "Ne pas conclure sur la marge","Majorité des coûts d’achat nuls ; marge non publiée.")+tile("TICKETS", "Panier moyen non validé","Identifiant de ticket non démontré comme unique au niveau réseau.")+tile("ZERO PRIX", "Lignes de formules","Un produit à 0 DH peut être un élément inclus dans une formule."),"ALERTES")+'</div><div class="c12">'+panel("Journées de CA atypiquement élevé","Seuil descriptif ≥ 90 000 DH, pas une fraude démontrée",table(["Magasin","Date","CA"],unusual.map(x=>'<tr><td>'+escape(x.store)+'</td><td>'+escape(x.date)+'</td><td class="r">'+mad(x.rev)+'</td></tr>')),"VIGILANCE")+'</div></div>'+previewNotice();
+}
+function previewRoute(name){
+ const routes={command:previewOverview,stores:previewStores,products:previewProducts,time:previewTime,pulse:previewPulse,benchmark:previewStores,opportunities:previewOpportunities,actions:actionsPage,quality:previewQuality};
+ try{(routes[name]||previewOverview)()}catch(e){console.error(e);C.innerHTML='<div class="notice">Erreur de calcul : '+escape(e.message)+'. Rechargez ou ouvrez les imports détaillés.</div>'}
+}
+
+function view(name){M.tab=name;$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(!M.rows.length){if(M.preview){$("#filters").style.display="flex";previewRoute(name)}else previewUnlock();return}$("#filters").style.display="flex";const routes={command,products:productsPage,time:timePage,pulse:pulsePage,benchmark:benchmarkPage,opportunities:opportunitiesPage,actions:actionsPage,quality:qualityPage};try{routes[name]()}catch(e){console.error(e);C.innerHTML='<div class="notice">Un calcul a échoué : '+escape(e.message)+'. Rechargez la page ; les données importées restent dans le navigateur.</div>'}}
 async function init(){
  try{
   M.db=await openDatabase();M.rows=await read("rows")||[];M.actions=await read("actions")||[];window._fineImports=await read("imports")||[];
-  if(!Array.isArray(M.rows)||!M.rows.length){empty();return}
+  if(!Array.isArray(M.rows)||!M.rows.length){const key=sessionStorage.getItem("venezia_session");if(!key){previewUnlock();return}try{await loadPreview(key);view("command")}catch(e){console.error(e);previewUnlock("Accès à la synthèse impossible : "+e.message)}return}
   M.unfiltered=baseAgg(M.rows);M.min=[...M.unfiltered.dates].sort()[0]||"";M.max=[...M.unfiltered.dates].sort().slice(-1)[0]||"";M.start=M.min;M.end=M.max;
   syncFilter();updateInputs();view(M.tab);
  }catch(e){console.error(e);C.innerHTML='<div class="fineEmpty"><h2>Lecture impossible</h2><p>Impossible de charger les données locales : '+escape(e.message)+'</p><a class="btn" href="./advanced.html">Vérifier vos imports →</a></div>'}
 }
 $$("[data-view]").forEach(b=>b.onclick=()=>{view(b.dataset.view);window.scrollTo({top:0,behavior:"smooth"})});
-$("#fApply").onclick=()=>{M.store=$("#fStore").value;M.family=$("#fFamily").value;M.start=$("#fStart").value||M.min;M.end=$("#fEnd").value||M.max;if(M.start>M.end){alert("La date de début doit précéder la date de fin.");return}C.innerHTML='<div class="statnote">Calcul en cours…</div>';setTimeout(()=>{syncFilter();M._peerKey=null;view(M.tab)},20)};
-$("#fReset").onclick=()=>{M.store="";M.family="";M.start=M.min;M.end=M.max;updateInputs();syncFilter();M._peerKey=null;view(M.tab)};
+$("#fApply").onclick=()=>{M.store=$("#fStore").value;M.family=$("#fFamily").value;M.start=$("#fStart").value||M.min;M.end=$("#fEnd").value||M.max;if(M.start>M.end){alert("La date de début doit précéder la date de fin.");return}C.innerHTML='<div class="statnote">Calcul en cours…</div>';setTimeout(()=>{if(!M.preview)syncFilter();M._peerKey=null;view(M.tab)},20)};
+$("#fReset").onclick=()=>{M.store="";M.family="";M.start=M.min;M.end=M.max;if(M.preview){$("#fStore").value="";$("#fStart").value=M.min;$("#fEnd").value=M.max}else{updateInputs();syncFilter()}M._peerKey=null;view(M.tab)};
 init();
 })();
