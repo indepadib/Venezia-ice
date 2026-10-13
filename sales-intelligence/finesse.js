@@ -93,17 +93,17 @@ function timePage(){
 
 function benchmarkPage(){
  labels("Benchmark magasins","Comparer les magasins sans confondre ancienneté et performance commerciale.");
- const a=present(),ranks=rank(a.stores),rows=[];
+ const a=present(),peer=peerData(),ranks=rank(a.stores),rows=[];const week=weekly();
  for(const [st,ca] of ranks){
   const dates=a.storeDays.get(st)||new Set(),d=dates.size,prod=[...a.storeProduct].filter(x=>x[0].startsWith(st+sep)).sort((x,y)=>y[1].rev-x[1].rev)[0];
   const dominant=[...a.storeFamily].filter(x=>x[0].startsWith(st+sep)).sort((x,y)=>y[1]-x[1])[0];
-  const week=weekly(),wCur=week.cur.stores.get(st)||0,wOld=week.prior.stores.get(st)||0;
+  const wCur=week.cur.stores.get(st)||0,wOld=week.prior.stores.get(st)||0;
   rows.push({st,ca,days:d,avg:ca/(d||1),product:prod?.[0].split(sep)[1]||"—",family:dominant?.[0].split(sep)[1]||"—",growth:diff(wCur,wOld)});
  }
  rows.sort((x,y)=>y.avg-x.avg);
  const trs=rows.map((x,i)=>'<tr><td>'+num(i+1)+'</td><td><b>'+escape(x.st)+'</b></td><td class="r">'+mad(x.ca)+'</td><td class="r">'+num(x.days)+'</td><td class="r">'+mad(x.avg)+'</td><td>'+escape(x.family)+'</td><td class="r">'+arrow(x.growth)+'</td></tr>');
  const st=M.store||rows[0]?.st||"",ca=a.stores.get(st)||0,other=a.rev-ca;
- const mixes=[...a.families].map(([fam,whole])=>{const local=a.storeFamily.get(st+sep+fam)||0,peers=whole-local,peerMix=other?peers/other:0,localMix=ca?local/ca:0;return {fam,local,localMix,peerMix,ratio:peerMix?localMix/peerMix:null}}).filter(x=>x.local>4000&&x.peerMix>0.005).sort((x,y)=>(y.ratio??0)-(x.ratio??0));
+ const mixes=[...peer.families].map(([fam,whole])=>{const local=peer.storeFamily.get(st+sep+fam)||0,peers=whole-local,peerMix=(peer.rev-ca)?peers/(peer.rev-ca):0,localMix=ca?local/ca:0;return {fam,local,localMix,peerMix,ratio:peerMix?localMix/peerMix:null}}).filter(x=>x.local>4000&&x.peerMix>0.005).sort((x,y)=>(y.ratio??0)-(x.ratio??0));
  const mixRows=mixes.slice(0,30).map(x=>'<tr><td>'+escape(x.fam)+'</td><td class="r">'+pct(x.localMix*100)+'</td><td class="r">'+pct(x.peerMix*100)+'</td><td class="r">'+(x.ratio===null?"—":'<span class="'+(x.ratio>=1?"positive":"negative")+'">'+p1.format(x.ratio)+'×</span>')+'</td></tr>');
  C.innerHTML=metricRow([metric("Magasins avec ventes",num(ranks.length),"Sur votre sélection","⌂"),metric("Meilleur CA/jour",mad(rows[0]?.avg||0),"Jours avec ventes observées","↗"),metric("CA réseau filtré",mad(a.rev),"Périmètre sélectionné","◈"),metric("Période",M.start+" → "+M.end,"Filtre temporel","◷")])+
  '<div class="fineGrid"><div class="c12">'+panel("Classement normalisé","Comparer CA/jour vendu, le CA global et la spécialisation",table(["#","Magasin","CA","Jours avec ventes","CA / jour","Famille dominante","Variation hebdo"],trs),"BENCHMARK")+'</div><div class="c7">'+panel("Indice de spécialisation · "+st,"Part locale / part dans les autres magasins (même période filtrée)",table(["Famille","Part locale","Part autres","Indice"],mixRows),"LOCAL VS RÉSEAU")+'</div><div class="c5">'+panel("Les points de vigilance","Quels ajustements sont nécessaires avant de décider ?",tile("ÉQUITÉ", "Ne pas comparer les CA cumulés seuls","Un magasin avec 89 jours de ventes ne peut pas être comparé sur le même total avec un magasin en comptant 134.")+tile("EXPOSITION", "Contrôler les jours réels ouverts","Jours avec ventes enregistrées ne prouvent ni ouverture complète ni disponibilité.")+tile("PAIRING", "Comparer les bons formats","Tourisme, mall, street, saison et menu conditionnent le mix de ventes."),"MÉTHODE")+'</div></div>'+computedCaveats();
@@ -130,9 +130,10 @@ function pulsePage(){
  '<div class="toolrow"><button id="downloadWeekly">↧ Exporter le Weekly Pulse</button></div><div class="notice">Les deux semaines sont comparées à horaires calendaires identiques, mais ne sont pas corrigées des fermetures, ruptures, événements ou disponibilité menu. Un changement de vente ne suffit pas à conclure sur la cause. Attention : le filtre de dates historique n’affecte pas le Weekly Pulse, qui porte toujours sur les deux dernières semaines entièrement achevées.</div>';
  $("#downloadWeekly").onclick=()=>exportCSV("venezia-weekly-pulse-"+w.b+".csv",["Dimension","Libellé","Semaine récente","Semaine précédente","Ecart MAD"],[...stores.map(x=>["Magasin",x.name,x.now,x.was,x.now-x.was]),...family.map(x=>["Famille",x.name,x.now,x.was,x.now-x.was]),...prods.map(x=>["Produit",x.name,x.now,x.was,x.now-x.was]),...hours.map(x=>["Heure",x.name,x.now,x.was,x.now-x.was])]);
 }
+function peerData(){const key=[M.start,M.end,M.family].join("|");if(M._peerKey!==key){M._peer=baseAgg(M.rows.filter(r=>(!M.family||r[3]===M.family)&&r[1]>=M.start&&r[1]<=M.end));M._peerKey=key}return M._peer}
 function opportunityCandidates(){
- const a=present();const result=[];
- const stores=[...a.stores.keys()].filter(s=>(a.storeDays.get(s)?.size||0)>=28&&a.stores.get(s)>=100000);
+ const a=peerData();const result=[];
+ const stores=[...a.stores.keys()].filter(s=>(!M.store||s===M.store)&&(a.storeDays.get(s)?.size||0)>=28&&a.stores.get(s)>=100000);
  const productTotals=new Map([...a.products].map(x=>[x[0],x[1].rev]));
  const famTotals=new Map(a.families);
  for(const st of stores){
@@ -196,7 +197,7 @@ async function init(){
  }catch(e){console.error(e);C.innerHTML='<div class="fineEmpty"><h2>Lecture impossible</h2><p>Impossible de charger les données locales : '+escape(e.message)+'</p><a class="btn" href="./advanced.html">Vérifier vos imports →</a></div>'}
 }
 $$("[data-view]").forEach(b=>b.onclick=()=>{view(b.dataset.view);window.scrollTo({top:0,behavior:"smooth"})});
-$("#fApply").onclick=()=>{M.store=$("#fStore").value;M.family=$("#fFamily").value;M.start=$("#fStart").value||M.min;M.end=$("#fEnd").value||M.max;if(M.start>M.end){alert("La date de début doit précéder la date de fin.");return}C.innerHTML='<div class="statnote">Calcul en cours…</div>';setTimeout(()=>{syncFilter();view(M.tab)},20)};
-$("#fReset").onclick=()=>{M.store="";M.family="";M.start=M.min;M.end=M.max;updateInputs();syncFilter();view(M.tab)};
+$("#fApply").onclick=()=>{M.store=$("#fStore").value;M.family=$("#fFamily").value;M.start=$("#fStart").value||M.min;M.end=$("#fEnd").value||M.max;if(M.start>M.end){alert("La date de début doit précéder la date de fin.");return}C.innerHTML='<div class="statnote">Calcul en cours…</div>';setTimeout(()=>{syncFilter();M._peerKey=null;view(M.tab)},20)};
+$("#fReset").onclick=()=>{M.store="";M.family="";M.start=M.min;M.end=M.max;updateInputs();syncFilter();M._peerKey=null;view(M.tab)};
 init();
 })();
