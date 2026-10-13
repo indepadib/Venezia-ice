@@ -6,7 +6,7 @@ const mad=x=>nf.format(Number(x)||0)+" DH",num=x=>nf.format(Number(x)||0),pct=x=
 const escape=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const dayNames=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"],sep="\x1f";
 const IDX={store:0,date:1,hour:2,family:3,category:4,product:5,rev:6,qty:7,paid:8,lines:9,zero:10,cost:11};
-const M={rows:[],actions:[],db:null,tab:"command",start:"",end:"",store:"",family:"",min:"",max:"",product:"",sort:"revenue",scope:null,unfiltered:null,loading:false};
+const M={rows:[],actions:[],db:null,tab:"command",start:"",end:"",store:"",family:"",category:"",min:"",max:"",product:"",sort:"revenue",scope:null,unfiltered:null,loading:false};
 function day(s){return new Date(s+"T00:00:00Z")}function shift(s,n){let d=day(s);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 function dot(a,b){return a?100*b/a:0}function diff(now,prev){return prev!==0?100*(now/prev-1):null}
 function arrow(n){return n===null?'<span class="muted">Pas de référence</span>':'<span class="'+(n>=0?"positive":"negative")+'">'+(n>=0?"+":"")+pct(n)+'</span>'}
@@ -37,21 +37,22 @@ function baseAgg(rows){
  }
  return a;
 }
-function filter(){const st=M.store,fam=M.family,lo=M.start,hi=M.end;return M.rows.filter(r=>(!st||r[0]===st)&&(!fam||r[3]===fam)&&(!lo||r[1]>=lo)&&(!hi||r[1]<=hi))}
+function filter(){const st=M.store,fam=M.family,cat=M.category,lo=M.start,hi=M.end;return M.rows.filter(r=>(!st||r[0]===st)&&(!fam||r[3]===fam)&&(!cat||r[4]===cat)&&(!lo||r[1]>=lo)&&(!hi||r[1]<=hi))}
 function present(){const s=M.scope;return s? s:""}
 function syncFilter(){M.scope=baseAgg(filter());const s=M.scope;$("#dataStatus").textContent="● "+num(M.rows.length)+" lignes agrégées";$("#dateStatus").textContent=M.min+" → "+M.max;return s}
 function updateInputs(){
  $("#fStore").innerHTML='<option value="">Tout le réseau</option>'+[...M.unfiltered.stores.keys()].sort().map(s=>'<option value="'+escape(s)+'">'+escape(s)+'</option>').join("");
  $("#fFamily").innerHTML='<option value="">Toutes les familles</option>'+[...M.unfiltered.families.keys()].sort().map(s=>'<option value="'+escape(s)+'">'+escape(s)+'</option>').join("");
- $("#fStore").value=M.store;$("#fFamily").value=M.family;$("#fStart").value=M.start;$("#fEnd").value=M.end;
+ $("#fStore").value=M.store;$("#fFamily").value=M.family;refreshCategoryOptions();$("#fStart").value=M.start;$("#fEnd").value=M.end;
 }
+function refreshCategoryOptions(){const source=new Set();for(const row of M.rows){if(!M.family||row[3]===M.family)source.add(row[4])}const cats=[...source].sort();$("#fCategory").innerHTML='<option value="">Toutes les catégories</option>'+cats.map(x=>'<option value="'+escape(x)+'">'+escape(x)+'</option>').join("");if(!cats.includes(M.category))M.category="";$("#fCategory").value=M.category}
 function labels(t,subtitle){$("#viewTitle").textContent=t;$("#viewSubtitle").textContent=subtitle}
 function exportCSV(name,header,rows){const text=[header,...rows].map(r=>r.map(v=>{let s=String(v??"");if(/^[=+\-@]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'}).join(";")).join("\r\n");let blob=new Blob(["\ufeff",text],{type:"text/csv;charset=utf-8"});let url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function dateLine(series){const a=rank(new Map([...series].sort((x,y)=>x[0].localeCompare(y[0]))));return a}
 function compactTrend(map){const d=[...map].sort((a,b)=>a[0].localeCompare(b[0]));if(!d.length)return '<p class="muted">Pas de données</p>';const max=Math.max(1,...d.map(x=>x[1]));const W=800,H=215,P=27,xx=i=>P+(W-2*P)*i/Math.max(1,d.length-1),yy=n=>H-P-(H-2*P)*n/max;let path=d.map((x,i)=>(i?"L":"M")+xx(i).toFixed(1)+" "+yy(x[1]).toFixed(1)).join(" ");return '<svg class="chart" viewBox="0 0 800 250" role="img" aria-label="Évolution quotidienne du CA"><path d="'+path+'" fill="none" stroke="#7659cc" stroke-width="3" stroke-linejoin="round"/>'+d.filter((_,i)=>i%Math.max(1,Math.floor(d.length/12))===0).map(x=>{let i=d.findIndex(y=>y[0]===x[0]);return '<circle r="3.6" cx="'+xx(i)+'" cy="'+yy(x[1])+'" fill="#fff" stroke="#7054cb" stroke-width="2"><title>'+x[0]+': '+mad(x[1])+'</title></circle><text x="'+xx(i)+'" y="245" font-size="11" fill="#9da5b6" text-anchor="middle">'+x[0].slice(5)+'</text>'}).join("")+'</svg>'}
 function getWk(){let end=M.max;if(!end)return null;let wd=day(end).getUTCDay();let sun=shift(end,-(wd||7));return {a:shift(sun,-6),b:sun,c:shift(sun,-13),d:shift(sun,-7)}}
 function weekly(scopeName=""){const w=getWk(),good=[],prior=[];if(!w)return {w,cur:baseAgg([]),prior:baseAgg([])};
- for(const r of M.rows){if(M.store&&r[0]!==M.store)continue;if(M.family&&r[3]!==M.family)continue;if(w.a<=r[1]&&r[1]<=w.b)good.push(r);else if(w.c<=r[1]&&r[1]<=w.d)prior.push(r)}
+ for(const r of M.rows){if(M.store&&r[0]!==M.store)continue;if(M.family&&r[3]!==M.family)continue;if(M.category&&r[4]!==M.category)continue;if(w.a<=r[1]&&r[1]<=w.b)good.push(r);else if(w.c<=r[1]&&r[1]<=w.d)prior.push(r)}
  return {w,cur:baseAgg(good),prior:baseAgg(prior)}
 }
 function computedCaveats(){return '<div class="notice">Lecture méthodologique : CA enregistré tel que dans la source ; prix de vente déjà étendu par quantité ; coûts et marges non fiables ; produits à 0 DH possibles dans les formules ; jours de vente ≠ jours d’ouverture ; une baisse peut venir d’une rupture, d’une fermeture ou d’un changement de menu.</div>'}
@@ -130,7 +131,7 @@ function pulsePage(){
  '<div class="toolrow"><button id="downloadWeekly">↧ Exporter le Weekly Pulse</button></div><div class="notice">Les deux semaines sont comparées à horaires calendaires identiques, mais ne sont pas corrigées des fermetures, ruptures, événements ou disponibilité menu. Un changement de vente ne suffit pas à conclure sur la cause. Attention : le filtre de dates historique n’affecte pas le Weekly Pulse, qui porte toujours sur les deux dernières semaines entièrement achevées.</div>';
  $("#downloadWeekly").onclick=()=>exportCSV("venezia-weekly-pulse-"+w.b+".csv",["Dimension","Libellé","Semaine récente","Semaine précédente","Ecart MAD"],[...stores.map(x=>["Magasin",x.name,x.now,x.was,x.now-x.was]),...family.map(x=>["Famille",x.name,x.now,x.was,x.now-x.was]),...prods.map(x=>["Produit",x.name,x.now,x.was,x.now-x.was]),...hours.map(x=>["Heure",x.name,x.now,x.was,x.now-x.was])]);
 }
-function peerData(){const key=[M.start,M.end,M.family].join("|");if(M._peerKey!==key){M._peer=baseAgg(M.rows.filter(r=>(!M.family||r[3]===M.family)&&r[1]>=M.start&&r[1]<=M.end));M._peerKey=key}return M._peer}
+function peerData(){const key=[M.start,M.end,M.family,M.category].join("|");if(M._peerKey!==key){M._peer=baseAgg(M.rows.filter(r=>(!M.family||r[3]===M.family)&&(!M.category||r[4]===M.category)&&r[1]>=M.start&&r[1]<=M.end));M._peerKey=key}return M._peer}
 function opportunityCandidates(){
  const a=peerData();const result=[];
  const stores=[...a.stores.keys()].filter(s=>(!M.store||s===M.store)&&(a.storeDays.get(s)?.size||0)>=28&&a.stores.get(s)>=100000);
@@ -205,10 +206,10 @@ function previewUnlock(error=""){
 async function loadPreview(key){
  const [fine,summary]=await Promise.all([decryptPack("./secure-finesse.enc",key),decryptPack("./secure-summary.enc",key)]);
  if(fine.version!==1||summary.v!==5||fine.stores.length!==summary.stores.length)throw Error("Format historique inattendu");
- M.preview={fine,summary};M.min="2026-06-01";M.max="2026-10-12";M.start=M.min;M.end=M.max;M.store="";M.family="";
+ M.preview={fine,summary};M.min="2026-06-01";M.max="2026-10-12";M.start=M.min;M.end=M.max;M.store="";M.family="";M.category="";
  M.unfiltered={stores:new Map(summary.stores.map(x=>[x[0],x[1]]))};
  $("#fStore").innerHTML='<option value="">Tout le réseau</option>'+fine.stores.map(s=>'<option>'+escape(s)+'</option>').join("");
- $("#fFamily").innerHTML='<option value="">Toutes les familles</option>';$("#fFamily").disabled=true;$("#fFamily").title="Filtre famille disponible après import de détail";
+ $("#fFamily").innerHTML='<option value="">Toutes les familles</option>';$("#fFamily").disabled=true;$("#fCategory").disabled=true;$("#fCategory").title="Filtre catégorie disponible après import complet";$("#fFamily").title="Filtre famille disponible après import de détail";
  $("#fStart").value=M.min;$("#fEnd").value=M.max;$("#fStore").value="";
  $("#dataStatus").textContent="● Historique chiffré chargé";$("#dateStatus").textContent="01/06 → 12/10/2026";$("#filters").style.display="flex";
 }
@@ -219,7 +220,7 @@ function pStoreTotal(){return pDates().reduce((a,x)=>a+x[1],0)}
 function pWk(){const k=previewStoreIndex(),a=M.preview.summary.weeklyStore;return [a.filter(x=>x[0]===0&&(k<0||x[1]===M.store)).reduce((t,x)=>t+x[2],0),a.filter(x=>x[0]===1&&(k<0||x[1]===M.store)).reduce((t,x)=>t+x[2],0)]}
 function pProds(){const d=M.preview.summary;return M.store?d.storeProducts.filter(x=>x[0]===M.store).map(x=>[x[1],x[2],x[3]]):d.globalProducts}
 function pFamilies(){const d=M.preview.summary;return M.store?d.storeFamily.filter(x=>x[0]===M.store).map(x=>[x[1],x[2]]):d.familyGlobal}
-function previewNotice(){return '<div class="notice"><b>Historique préchargé :</b> CA, jours, heures, catégories et évolution issus de vos données réelles. Les tops produits préchargés sont limités aux 24 premiers du réseau et aux 8 premiers par magasin. Les analyses sur tous les produits, le filtre famille et les futurs CSV sont disponibles après import du rapport détaillé via <a href="./advanced.html" style="color:#6b4ac2;font-weight:800">Imports CSV</a>.</div>'}
+function previewNotice(){return '<div class="notice"><b>Historique préchargé :</b> CA, jours, heures, catégories et évolution issus de vos données réelles. Le filtre de dates agit ici uniquement sur le CA quotidien et le benchmark des magasins ; les produits, familles, heures et semaines restent sur leurs périodes historiques définies. Les tops produits préchargés sont limités aux 24 premiers du réseau et aux 8 premiers par magasin. Les analyses sur tous les produits, le filtre famille et les futurs CSV sont disponibles après import du rapport détaillé via <a href="./advanced.html" style="color:#6b4ac2;font-weight:800">Imports CSV</a>.</div>'}
 function pHour(){const k=previewStoreIndex();return k<0?M.preview.summary.hourly.map(x=>[Number(x[0]),x[1]]):pRows("storeHour").map(x=>[Number(x[1]),x[2]])}
 function pBarsHour(){const raw=new Map(pHour()),max=Math.max(1,...raw.values());return '<div class="hourchart">'+Array.from({length:24},(_,h)=>{const v=raw.get(h)||0;return '<div class="houritem" title="'+h+"h : "+mad(v)+'"><div class="hourcolumn" style="height:'+Math.max(2,v/max*160)+'px"></div><small>'+(h%3===0?h+"h":"")+'</small></div>'}).join("")+'</div>'}
 function pWeekCategory(key,storeSpecific=true){
@@ -300,17 +301,17 @@ function previewRoute(name){
  try{(routes[name]||previewOverview)()}catch(e){console.error(e);C.innerHTML='<div class="notice">Erreur de calcul : '+escape(e.message)+'. Rechargez ou ouvrez les imports détaillés.</div>'}
 }
 
-function view(name){M.tab=name;$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(!M.rows.length){if(M.preview){$("#filters").style.display="flex";previewRoute(name)}else previewUnlock();return}$("#filters").style.display="flex";const routes={command,products:productsPage,time:timePage,pulse:pulsePage,benchmark:benchmarkPage,opportunities:opportunitiesPage,actions:actionsPage,quality:qualityPage};try{routes[name]()}catch(e){console.error(e);C.innerHTML='<div class="notice">Un calcul a échoué : '+escape(e.message)+'. Rechargez la page ; les données importées restent dans le navigateur.</div>'}}
+function view(name){M.tab=name;$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(!M.rows.length){if(M.preview){$("#filters").style.display="flex";const allowDates=(name==="command"||name==="stores"||name==="benchmark");$("#fStart").disabled=!allowDates;$("#fEnd").disabled=!allowDates;previewRoute(name)}else previewUnlock();return}$("#filters").style.display="flex";const routes={command,products:productsPage,time:timePage,pulse:pulsePage,benchmark:benchmarkPage,opportunities:opportunitiesPage,actions:actionsPage,quality:qualityPage};try{routes[name]()}catch(e){console.error(e);C.innerHTML='<div class="notice">Un calcul a échoué : '+escape(e.message)+'. Rechargez la page ; les données importées restent dans le navigateur.</div>'}}
 async function init(){
  try{
   M.db=await openDatabase();M.rows=await read("rows")||[];M.actions=await read("actions")||[];window._fineImports=await read("imports")||[];
   if(!Array.isArray(M.rows)||!M.rows.length){const key=sessionStorage.getItem("venezia_session");if(!key){previewUnlock();return}try{await loadPreview(key);view("command")}catch(e){console.error(e);previewUnlock("Accès à la synthèse impossible : "+e.message)}return}
-  M.unfiltered=baseAgg(M.rows);M.min=[...M.unfiltered.dates].sort()[0]||"";M.max=[...M.unfiltered.dates].sort().slice(-1)[0]||"";M.start=M.min;M.end=M.max;
+  M.unfiltered=baseAgg(M.rows);$("#fFamily").onchange=()=>{M.family=$("#fFamily").value;M.category="";refreshCategoryOptions()};M.min=[...M.unfiltered.dates].sort()[0]||"";M.max=[...M.unfiltered.dates].sort().slice(-1)[0]||"";M.start=M.min;M.end=M.max;
   syncFilter();updateInputs();view(M.tab);
  }catch(e){console.error(e);C.innerHTML='<div class="fineEmpty"><h2>Lecture impossible</h2><p>Impossible de charger les données locales : '+escape(e.message)+'</p><a class="btn" href="./advanced.html">Vérifier vos imports →</a></div>'}
 }
 $$("[data-view]").forEach(b=>b.onclick=()=>{view(b.dataset.view);window.scrollTo({top:0,behavior:"smooth"})});
-$("#fApply").onclick=()=>{M.store=$("#fStore").value;M.family=$("#fFamily").value;M.start=$("#fStart").value||M.min;M.end=$("#fEnd").value||M.max;if(M.start>M.end){alert("La date de début doit précéder la date de fin.");return}C.innerHTML='<div class="statnote">Calcul en cours…</div>';setTimeout(()=>{if(!M.preview)syncFilter();M._peerKey=null;view(M.tab)},20)};
-$("#fReset").onclick=()=>{M.store="";M.family="";M.start=M.min;M.end=M.max;if(M.preview){$("#fStore").value="";$("#fStart").value=M.min;$("#fEnd").value=M.max}else{updateInputs();syncFilter()}M._peerKey=null;view(M.tab)};
+$("#fApply").onclick=()=>{M.store=$("#fStore").value;M.family=$("#fFamily").value;M.category=$("#fCategory").value;M.start=$("#fStart").value||M.min;M.end=$("#fEnd").value||M.max;if(M.start>M.end){alert("La date de début doit précéder la date de fin.");return}C.innerHTML='<div class="statnote">Calcul en cours…</div>';setTimeout(()=>{if(!M.preview)syncFilter();M._peerKey=null;view(M.tab)},20)};
+$("#fReset").onclick=()=>{M.store="";M.family="";M.category="";M.start=M.min;M.end=M.max;if(M.preview){$("#fStore").value="";$("#fStart").value=M.min;$("#fEnd").value=M.max}else{updateInputs();syncFilter()}M._peerKey=null;view(M.tab)};
 init();
 })();
