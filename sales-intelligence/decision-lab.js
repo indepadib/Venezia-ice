@@ -142,7 +142,9 @@ function renderPulse(){const w=S.week;const a=w.a,b=w.b,base=Core.metrics(a.tota
  col(5,panel('Mouvements par famille','CA hebdomadaire et écart',mTable(movesFamilies,'families',20),'CATÉGORIES')))+
  note('La différence est une différence de ventes enregistrées, pas la conséquence prouvée d’une opération. Contrôler ruptures, météo, ouvertures, mise en avant et promotions. Un produit absent de la première semaine n’est pas nécessairement un nouveau produit.',true);
 }
-function renderOpportunities(){const f=S.filters,env=S.env,allScope=Core.scoped(env,{...f,store:''}),all=Core.aggregate(env,allScope);
+function renderOpportunities(){const f=S.filters,env=S.env;
+ if(f.cohort==='all')return coverageWarning()+panel('Comparatif suspendu pour ce périmètre','Les sources ne couvrent pas les mêmes dates',note('Les dix magasins historiques couvrent le 1er juin au 12 octobre ; Aéroport M5 couvre de manière partielle le 12 octobre au 9 novembre. Les différences de mix ne peuvent pas être présentées comme des opportunités commerciales valides entre ces onze sites. Sélectionnez « Réseau historique · 10 magasins » pour retrouver un benchmark exploitable.',true),'GARDE-FOU');
+ const allScope=Core.scoped(env,{...f,store:''}),all=Core.aggregate(env,allScope);
  const candidates=[],targets=f.store?[env.cube.dims.stores.indexOf(f.store)]:[...all.store.keys()].map(Number);
  for(const sid of targets){const peers=Core.storePeers(env,all,sid,3).filter(x=>x.index<.72&&x.hypotheticalGap>=500);for(const x of peers){let conf=x.peers>=5&&x.days>=35?'moyenne':'exploratoire';const score=x.hypotheticalGap*(1+Math.min(x.peers,7)/10);candidates.push({...x,confidence:conf,score})}}
  candidates.sort((a,b)=>b.score-a.score);
@@ -162,7 +164,7 @@ function renderQuality(){const env=S.env,a=S.agg,m=Core.metrics(a.total),audit=e
  const totalAudit=source.map(x=>'<tr><td><b>'+safe(x.id===0?'Réseau initial · 10 magasins':'Aéroport M5 · 1 magasin')+'</b></td><td>'+safe(x.start)+'</td><td>'+safe(x.end)+'</td><td><span class="pill '+(x.id?'alert':'green')+'">'+safe(x.coverage)+'</span></td></tr>');
  const problemFamily=env.cube.dims.families.indexOf('personnel'),personnelRevenue=problemFamily>=0?(a.family.get(problemFamily)?.[0]||0)/100:0;
  const canonical=new Map();for(let id=0;id<env.cube.dims.products.length;id++){const product=env.cube.dims.products[id];const key=product.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,' ').trim().toLowerCase();if(!canonical.has(key))canonical.set(key,[]);canonical.get(key).push({id,name:product,ca:(a.product.get(id)?.[0]||0)/100})}
- const duplicateGroups=[...canonical.values()].filter(v=>v.length>1&&v.some(x=>x.ca>0)).sort((x,y)=>y.reduce((n,a)=>n+a.ca,0)-x.reduce((n,a)=>n+a.ca,0));
+ const duplicateGroups=[...canonical.values()].filter(v=>v.filter(x=>x.ca>0).length>1).sort((x,y)=>y.reduce((n,a)=>n+a.ca,0)-x.reduce((n,a)=>n+a.ca,0));
  const duplicateRows=duplicateGroups.map(group=>'<tr><td>'+group.map(x=>safe(x.name)).join(' <span class="muted">/</span> ')+'</td><td class="r">'+euro(group.reduce((n,x)=>n+x.ca,0))+'</td><td><span class="pill alert">À vérifier</span></td></tr>');
  const totalNetwork=audit.baselineRevenueCents/100,airportRevenue=audit.airportRevenueCents/100,allTotal=audit.totalRevenueCents/100;
  return coverageWarning()+cards(card('Lignes de ventes du périmètre',integer(m.lines),'Agrégation de données source'),card('Lignes à 0 DH',pct(m.lines?100*m.zeroLines/m.lines:0),integer(m.zeroLines)+' lignes'),card('Coûts nuls',pct(m.lines?100*m.missingCost/m.lines:0),'Aucune marge fiable'),card('Lignes avec valeur négative',integer(m.returnLines),'Retours et corrections éventuels'))+
