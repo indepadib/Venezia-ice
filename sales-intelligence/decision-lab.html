@@ -1,0 +1,40 @@
+<!doctype html><html lang="fr"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#f8f8fd">
+<title>Venezia Ice — Decision Lab</title><link rel="stylesheet" href="./decision-lab.css?v=1"></head>
+<body>
+<div class="app-shell">
+<aside class="sidebar">
+  <a class="identity" href="./index.html"><span class="identity-mark">VI</span><span><strong>Venezia Ice</strong><small>DECISION INTELLIGENCE</small></span></a>
+  <div class="sidebar-label">PILOTAGE COMMERCIAL</div>
+  <nav id="nav" class="nav">
+    <button data-view="cockpit" class="nav-item selected"><span class="nav-ico">◈</span> Executive cockpit</button>
+    <button data-view="products" class="nav-item"><span class="nav-ico">✦</span> Product intelligence</button>
+    <button data-view="cross" class="nav-item"><span class="nav-ico">▦</span> Analyses croisées</button>
+    <button data-view="benchmark" class="nav-item"><span class="nav-ico">♧</span> ADN des magasins</button>
+    <button data-view="pulse" class="nav-item"><span class="nav-ico">↗</span> Weekly performance</button>
+    <button data-view="opportunities" class="nav-item"><span class="nav-ico">◎</span> Opportunity engine</button>
+    <button data-view="quality" class="nav-item"><span class="nav-ico">◇</span> Fiabilité & couverture</button>
+    <button data-view="decisions" class="nav-item"><span class="nav-ico">✓</span> Journal des décisions</button>
+  </nav>
+  <div class="sidebar-bottom"><div class="sidebar-bottom-title">Pilotage responsable</div><p>Les écarts observés sont des signaux à investiguer, pas des causes démontrées.</p><a href="./advanced.html#import">⇧ Importer un nouveau rapport</a><a href="./finesse.html">◁ Analyse de précision précédente</a></div>
+</aside>
+<div class="workspace">
+  <header class="topbar"><div class="breadcrumb">VENEZIA ICE <span> / </span> <b>DECISION LAB</b></div><div class="top-actions"><span id="status" class="status">Données chiffrées</span><a class="toplink" href="./advanced.html#import">Importer Excel / CSV</a></div></header>
+  <div class="page-head"><div><div class="overline">LA PERFORMANCE DE VOTRE RÉSEAU, À LA FINESSE</div><h1 id="title">Executive cockpit</h1><p id="subtitle">Du produit à la décision, avec des comparaisons maîtrisées.</p></div><button id="exportBtn" class="outline" disabled>↓ Exporter l’analyse</button></div>
+  <section class="filters" id="filters" hidden>
+    <label>COHORTE <select id="cohort"><option value="historical">Réseau historique · 10 magasins</option><option value="airport">Aéroport M5 · nouveau</option><option value="all">Tous · 11 magasins (non comparables)</option></select></label>
+    <label>MAGASIN <select id="store"><option value="">Tout le périmètre</option></select></label>
+    <label>FAMILLE <select id="family"><option value="">Toutes les familles</option></select></label>
+    <label>CATÉGORIE <select id="category"><option value="">Toutes les catégories</option></select></label>
+    <label>CANAL <select id="channel"><option value="">Tous les canaux</option></select></label>
+    <label>DU <input id="from" type="date"></label>
+    <label>AU <input id="to" type="date"></label>
+    <label>JOURNÉE <select id="daypart"><option value="">Toutes les heures</option><option value="morning">Matin · 06–11h</option><option value="lunch">Midi · 12–15h</option><option value="afternoon">Après-midi · 16–18h</option><option value="evening">Soir · 19–23h</option><option value="night">Nuit · 00–05h</option></select></label>
+    <div class="filters-actions"><button class="primary" id="apply">Analyser</button><button class="outline" id="reset">Réinitialiser</button></div>
+  </section>
+  <div class="context-line" id="context" hidden></div><div id="content"><div class="loader"><div class="spinner"></div>Ouverture de votre moteur analytique…</div></div>
+  <footer class="footer">Données issues de vos exports Venezia Ice, déchiffrées localement. CA = valeur de vente enregistrée ; marge indisponible lorsque les coûts sont incomplets. Jours vendus ≠ jours d’ouverture certifiés. <a href="./index.html">Retour Vue Direction</a>.</footer>
+</div></div>
+<div class="toast" id="toast" hidden></div>
+<script defer src="./decision-core.js?v=1"></script><script defer src="./decision-lab.js?v=1"></script>
+</body></html>
