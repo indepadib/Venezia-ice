@@ -143,6 +143,6 @@ function persist(k,v){return new Promise((yes,no)=>{let tx=state.db.transaction(
 document.querySelectorAll('[data-page]').forEach(e=>e.onclick=()=>setPage(e.dataset.page));
 $('#filterApply').onclick=()=>{state.store=$('#filterStore').value;state.start=$('#filterStart').value;state.end=$('#filterEnd').value;render()};
 $('#filterReset').onclick=()=>{state.store='';state.start='';state.end='';let [a,b]=firstLast();$('#filterStart').value=a;$('#filterEnd').value=b;state.start=a;state.end=b;storeOptions();render()};
-(async()=>{try{state.db=await openDB();state.rows=await get('rows')||[];state.imports=await get('imports')||[];state.actions=await get('actions')||[];state.aliases=await get('aliases')||{};setDates();storeOptions();render()}catch(e){msg('Impossible d’accéder au stockage local : '+e.message,'warn');setPage('import')}})();
+(async()=>{try{state.db=await openDB();state.rows=await get('rows')||[];state.imports=await get('imports')||[];state.actions=await get('actions')||[];state.aliases=await get('aliases')||{};setDates();storeOptions();if(location.hash==="#import")setPage("import");else render()}catch(e){msg('Impossible d’accéder au stockage local : '+e.message,'warn');setPage('import')}})();
 })();
 </script></body></html>
