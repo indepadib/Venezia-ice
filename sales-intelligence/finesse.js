@@ -209,12 +209,12 @@ function previewUnlock(error=""){
 async function loadPreview(key){
  const [fine,summary]=await Promise.all([decryptPack("./secure-finesse.enc",key),decryptPack("./secure-summary.enc",key)]);
  if(fine.version!==1||summary.v!==5||fine.stores.length!==summary.stores.length)throw Error("Format historique inattendu");
- M.preview={fine,summary};M.min="2026-06-01";M.max="2026-10-12";M.start=M.min;M.end=M.max;M.store="";M.family="";M.category="";
+ M.preview={fine,summary};try{const addon=await window.VeneziaAddon.load(key);M.airportRows=addon.rows}catch(err){console.warn("Données Aéroport non disponibles",err);M.airportRows=[]}M.min="2026-06-01";M.max=M.airportRows.length?"2026-11-09":"2026-10-12";M.start=M.min;M.end=M.max;M.store="";M.family="";M.category="";
  M.unfiltered={stores:new Map(summary.stores.map(x=>[x[0],x[1]]))};
- $("#fStore").innerHTML='<option value="">Tout le réseau</option>'+fine.stores.map(s=>'<option>'+escape(s)+'</option>').join("");
+ $("#fStore").innerHTML='<option value="">Tout le réseau</option>'+fine.stores.map(s=>'<option>'+escape(s)+'</option>').join("")+(M.airportRows.length?'<option value="Aéroport M5">Aéroport M5 · nouveau</option>':"");
  $("#fFamily").innerHTML='<option value="">Toutes les familles</option>';$("#fFamily").disabled=true;$("#fCategory").disabled=true;$("#fCategory").title="Filtre catégorie disponible après import complet";$("#fFamily").title="Filtre famille disponible après import de détail";
  $("#fStart").value=M.min;$("#fEnd").value=M.max;$("#fStore").value="";
- $("#dataStatus").textContent="● Historique chiffré chargé";$("#dateStatus").textContent="01/06 → 12/10/2026";$("#filters").style.display="flex";
+ $("#dataStatus").textContent="● Historique chiffré chargé";$("#dateStatus").textContent="Historique 10 magasins : 12/10 ; Aéroport : 09/11";$("#filters").style.display="flex";
 }
 function previewStoreIndex(){return M.preview?.fine?.stores?.indexOf(M.store)??-1}
 function pRows(source,idx=0){const a=M.preview.fine[source]||[],k=previewStoreIndex();return a.filter(x=>k<0||x[idx]===k)}
@@ -299,12 +299,65 @@ function previewQuality(){
  C.innerHTML=metricRow([metric("Enregistrements",num(d.overall[1]),"Lignes de vente source"),metric("CA réseau",mad(value),"Montant historique","↗"),metric("Quantités payées",num(d.overall[2]),"Prix > 0","◈"),metric("Lignes zéro DH",num(d.overall[3]),"Formules et cas à vérifier","◎")])+
  '<div class="fineGrid"><div class="c6">'+panel("Contrôles des totaux","Arrondis des agrégations, tolérance 20 DH",table(["Recalcul","CA","Écart vs réseau"],checks.map(x=>'<tr><td>'+x[0]+'</td><td class="r">'+mad(x[1])+'</td><td class="r">'+(Math.abs(x[1]-value)<=20?'<span class="positive">OK</span>':'<span class="negative">'+mad(x[1]-value)+'</span>')+'</td></tr>')),"RÉCONCILIATION")+'</div><div class="c6">'+panel("Import complet","Le prochain niveau de fiabilité",tile("COÛTS", "Ne pas conclure sur la marge","Majorité des coûts d’achat nuls ; marge non publiée.")+tile("TICKETS", "Panier moyen non validé","Identifiant de ticket non démontré comme unique au niveau réseau.")+tile("ZERO PRIX", "Lignes de formules","Un produit à 0 DH peut être un élément inclus dans une formule."),"ALERTES")+'</div><div class="c12">'+panel("Journées de CA atypiquement élevé","Seuil descriptif ≥ 90 000 DH, pas une fraude démontrée",table(["Magasin","Date","CA"],unusual.map(x=>'<tr><td>'+escape(x.store)+'</td><td>'+escape(x.date)+'</td><td class="r">'+mad(x.rev)+'</td></tr>')),"VIGILANCE")+'</div></div>'+previewNotice();
 }
-function previewRoute(name){
+
+function airportPrecision(mode){
+ const source=M.airportRows||[],rows=source.filter(x=>(!M.start||x[1]>=M.start)&&(!M.end||x[1]<=M.end)&&(!M.family||x[3]===M.family)&&(!M.category||x[4]===M.category));
+ const a=baseAgg(rows),t=a.rev,products=[...a.products].sort((x,y)=>y[1].rev-x[1].rev),byHour=rank(a.hours),byDay=[...a.daily].sort((x,y)=>x[0].localeCompare(y[0])),byFam=rank(a.families),store="Aéroport M5";
+ const caveat='<div class="notice"><b>Export partiel Aéroport M5 :</b> fichier de 3 158 lignes (80 863 DH sur toutes les dates), provenant d’un seul magasin. Données du 12 octobre au 9 novembre 2026, malgré un nom de fichier se terminant au 8 novembre. Forte concentration du CA du 5 au 8 novembre : ne pas comparer ce magasin à un réseau entièrement actualisé.</div>';
+ const simpleProd=table(["#","Produit","CA","Qté payée","Part CA"],products.slice(0,150).map((x,i)=>'<tr><td>'+num(i+1)+'</td><td><b>'+escape(x[0])+'</b></td><td class="r">'+mad(x[1].rev)+'</td><td class="r">'+num(x[1].qty)+'</td><td class="r">'+pct(100*x[1].rev/(t||1))+'</td></tr>'));
+ const times=Array.from({length:24},(_,h)=>[h,a.hours.get(h)||0]);
+ const hourChart='<div class="hourchart">'+times.map(([h,v])=>'<div class="houritem" title="'+h+'h : '+mad(v)+'"><div class="hourcolumn" style="height:'+Math.max(2,v/Math.max(1,...a.hours.values())*159)+'px"></div><small>'+(h%3===0?h+"h":"")+'</small></div>').join("")+'</div>';
+ function overview(){
+  labels("Aéroport M5 · Analyse détaillée","Nouveau point de vente, produit × catégorie × heure × jour de vente.");
+  C.innerHTML=metricRow([metric("CA enregistré",mad(t),"Période sélectionnée"),metric("Lignes de vente",num(a.lines),"Récapitulatif des lignes","▤"),metric("Quantités payées",num(a.paid),"Ne compte pas les lignes à zéro","◈"),metric("Jours avec vente",num(a.dates.size),"20 jours au maximum","◷")])+
+  '<div class="fineGrid"><div class="c8">'+panel("Évolution du CA quotidien","La plupart des ventes sont observées du 5 au 8 novembre",compactTrend(a.daily),"DATES")+'</div><div class="c4">'+panel("Familles moteurs","CA par famille à Aéroport M5",bars(byFam,12),"FAMILLES")+'</div><div class="c6">'+panel("Les produits les plus vendus","Top 18 CA pour ce seul magasin",bars(products.map(x=>[x[0],x[1].rev]),18),"PRODUITS")+'</div><div class="c6">'+panel("Heures fortes","CA observé à chaque heure",hourChart,"HORAIRES")+'</div><div class="c12">'+panel("Classement exhaustif des produits","CA et quantités payées du magasin",simpleProd,"TOP / FLOP")+'</div></div>'+caveat;
+ }
+ if(mode==="airport"||mode==="command"){overview();return}
+ if(mode==="products"){
+  labels("Aéroport M5 · Produits","Tous les produits réellement vendus, en chiffre d’affaires et volume.");
+  let low=products.filter(x=>x[1].rev>0).slice().sort((a,b)=>a[1].rev-b[1].rev).slice(0,30);
+  C.innerHTML=metricRow([metric("Produits distincts",num(products.length),"Toutes familles"),metric("Leader",products[0]?.[0]||"—",mad(products[0]?.[1].rev||0),"★"),metric("Top 10 CA",mad(products.slice(0,10).reduce((z,x)=>z+x[1].rev,0)),"Cumul des leaders","↗"),metric("Qté payée",num(a.paid),"Total du magasin","◈")])+
+  '<div class="fineGrid"><div class="c7">'+panel("Tops produits","Classement complet par CA",simpleProd,"TOP 150")+'</div><div class="c5">'+panel("Petits contributeurs","Candidats à investiguer — pas des flops confirmés",table(["Produit","CA","Qté payée"],low.map(x=>'<tr><td>'+escape(x[0])+'</td><td class="r">'+mad(x[1].rev)+'</td><td class="r">'+num(x[1].qty)+'</td></tr>')),"LOW SALES")+'</div></div>'+caveat;return;
+ }
+ if(mode==="time"){
+  labels("Aéroport M5 · Heures et jours","CA horaire et journées fortes pour adapter le service.");
+  const dw=new Map();for(const r of rows){let wd=day(r[1]).getUTCDay();kv(dw,dayNames[wd],r[6])}
+  let matrix=new Map(),max=1;for(const r of rows){let wd=day(r[1]).getUTCDay(),key=wd+"|"+r[2];kv(matrix,key,r[6]);max=Math.max(max,matrix.get(key))}
+  let mat='<div class="overflow"><div class="hourMatrix"><span></span>'+Array.from({length:24},(_,h)=>'<span>'+(h%3===0?h+"h":"")+'</span>').join("");
+  for(let d=1;d<=7;d++){let wd=d%7;mat+='<span>'+dayNames[wd].slice(0,3)+'</span>';for(let h=0;h<24;h++){let v=matrix.get(wd+"|"+h)||0;mat+='<div class="hcell" title="'+dayNames[wd]+" "+h+"h : "+mad(v)+'" style="background:rgba(113,85,205,'+(0.05+.9*v/max).toFixed(3)+')"></div>'}}mat+='</div></div>';
+  C.innerHTML=metricRow([metric("Heure leader",String(byHour[0]?.[0]??"—")+"h",mad(byHour[0]?.[1]||0),"◷"),metric("CA avant midi",mad(times.filter(x=>x[0]<12).reduce((z,x)=>z+x[1],0)),"Matin"),metric("CA 12–17h",mad(times.filter(x=>x[0]>=12&&x[0]<18).reduce((z,x)=>z+x[1],0)),"Service midi","↗"),metric("CA après 18h",mad(times.filter(x=>x[0]>=18).reduce((z,x)=>z+x[1],0)),"Soir","◈")])+
+  '<div class="fineGrid"><div class="c8">'+panel("CA par heure","Répartition horaire du magasin",hourChart,"24H")+'</div><div class="c4">'+panel("Heures les plus vendeuses","Top 10 heures",bars(byHour.map(x=>[x[0]+"h",x[1]]),10),"HEURES")+'</div><div class="c12">'+panel("Jour de semaine × heure","Heatmap basée sur les ventes disponibles",mat,"HEATMAP")+'</div><div class="c6">'+panel("Jours de semaine","Part des différentes journées",bars(rank(dw),7),"JOURS")+'</div><div class="c6">'+panel("Ventes quotidiennes","Classement des journées",bars(byDay.slice().sort((a,b)=>b[1]-a[1]),20),"DATES")+'</div></div>'+caveat;return;
+ }
+ if(mode==="pulse"){
+  labels("Aéroport M5 · Weekly Pulse","Comparaison exploratoire, non comparable à un réseau en régime normal.");
+  const now=baseAgg(rows.filter(r=>r[1]>="2026-11-02"&&r[1]<="2026-11-08")),prev=baseAgg(rows.filter(r=>r[1]>="2026-10-26"&&r[1]<="2026-11-01"));
+  function movement(current,before){const keys=new Set([...current.keys(),...before.keys()]);return [...keys].map(k=>{const n=current.get(k)?.rev??current.get(k)??0,p=before.get(k)?.rev??before.get(k)??0;return [k,n,p]}).sort((a,b)=>Math.abs(b[1]-b[2])-Math.abs(a[1]-a[2])).slice(0,40)}
+  const tableMove=m=>table(["Référence","02–08/11","26/10–01/11","Écart"],m.map(x=>'<tr><td>'+escape(x[0])+'</td><td class="r">'+mad(x[1])+'</td><td class="r">'+mad(x[2])+'</td><td class="r">'+(x[1]>=x[2]?"+":"")+mad(x[1]-x[2])+'</td></tr>'));
+  C.innerHTML='<div class="notice">Le magasin semble avoir une couverture de ventes très limitée avant le 5 novembre. La progression affichée est <b>descriptive</b>, et ne doit pas être présentée comme une croissance à périmètre stable. Ce module compare uniquement les périodes du fichier Aéroport.</div>'+
+  metricRow([metric("CA 02–08 novembre",mad(now.rev),"Sept jours calendaires"),metric("CA 26/10–01/11",mad(prev.rev),"Période antérieure","◷"),metric("Écart en valeur",(now.rev>=prev.rev?"+":"")+mad(now.rev-prev.rev),"À contextualiser","↗"),metric("Jours avec vente",num(now.dates.size)+" / "+num(prev.dates.size),"Volume de jours observés","◈")])+
+  '<div class="fineGrid"><div class="c6">'+panel("Produits qui changent","Écarts de CA hebdomadaire",tableMove(movement(now.products,prev.products)),"PRODUITS")+'</div><div class="c6">'+panel("Familles qui changent","Écarts de CA hebdomadaire",tableMove(movement(now.families,prev.families)),"FAMILLES")+'</div></div>'+caveat;return;
+ }
+ if(mode==="quality"||mode==="opportunities"){
+  labels("Aéroport M5 · Qualité et décisions","Contrôler les classifications, les dates et la concentration des ventes.");
+  const special=a.families.get("personnel")||0;
+  C.innerHTML=metricRow([metric("Lignes d’origine",num(a.lines),"Export Aéroport M5"),metric("Lignes 0 DH",num(a.zero),pct(100*a.zero/(a.lines||1))+" des lignes","◈"),metric("Coûts à zéro",num(a.cost),"Marge non exploitable","◎"),metric("Famille personnel",mad(special),pct(100*special/(t||1))+" du CA enregistré","★")])+
+  '<div class="fineGrid"><div class="c7">'+panel("Contrôles métier prioritaires","Points à vérifier avant décision",tile("PÉRIMÈTRE","Aéroport M5 seul magasin de cet export","Ne pas publier de variation réseau octobre-novembre.")+tile("DATES","Le 9 novembre apparaît hors nom du fichier","Respecter la date source, et confirmer si le 9 novembre est partiel.")+tile("CLASSEMENT","La famille personnel est contributrice","Vérifier son statut commercial, ses règles de prix et ses comparaisons possibles."),"VIGILANCE")+'</div><div class="c5">'+panel("Répartition famille","Ventilation commerciale à valider",bars(byFam,10),"MIX")+'</div></div>'+caveat;return;
+ }
+ if(mode==="benchmark"){
+  labels("Aéroport M5 · Couverture du fichier","Pas de benchmarking intermagasin fiable sur ce nouvel export.");
+  C.innerHTML=metricRow([metric("Magasins couverts","1 seul","Aéroport M5"),metric("Jours de vente",num(a.dates.size),"Dates non continues","◷"),metric("CA enregistré",mad(t),"Période filtrée","↗"),metric("Comparabilité","Limitée","Absence des autres magasins","◎")])+
+  '<div class="fineGrid"><div class="c12">'+panel("Répartition quotidienne","Ventes et dates réellement présentes",table(["Date","CA"],byDay.map(x=>'<tr><td>'+escape(x[0])+'</td><td class="r">'+mad(x[1])+'</td></tr>')),"DATES")+'</div></div>'+caveat;return;
+ }
+ if(mode==="actions"){actionsPage();return}
+ overview();
+}
+
+function previewRoute(name){if((M.store==="Aéroport M5"||name==="airport")&&M.airportRows?.length){airportPrecision(name);return}
  const routes={command:previewOverview,stores:previewStores,products:previewProducts,time:previewTime,pulse:previewPulse,benchmark:previewStores,opportunities:previewOpportunities,actions:actionsPage,quality:previewQuality};
  try{(routes[name]||previewOverview)()}catch(e){console.error(e);C.innerHTML='<div class="notice">Erreur de calcul : '+escape(e.message)+'. Rechargez ou ouvrez les imports détaillés.</div>'}
 }
 
-function view(name){M.tab=name;$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(!M.rows.length){if(M.preview){$("#filters").style.display="flex";const allowDates=(name==="command"||name==="stores"||name==="benchmark");$("#fStart").disabled=!allowDates;$("#fEnd").disabled=!allowDates;previewRoute(name)}else previewUnlock();return}$("#filters").style.display="flex";const routes={command,products:productsPage,time:timePage,pulse:pulsePage,benchmark:benchmarkPage,opportunities:opportunitiesPage,actions:actionsPage,quality:qualityPage};try{routes[name]()}catch(e){console.error(e);C.innerHTML='<div class="notice">Un calcul a échoué : '+escape(e.message)+'. Rechargez la page ; les données importées restent dans le navigateur.</div>'}}
+function view(name){if(name==="airport"&&M.airportRows?.length){M.store="Aéroport M5";M.start="2026-10-12";M.end="2026-11-09";$("#fStore").value=M.store;$("#fStart").value=M.start;$("#fEnd").value=M.end}M.tab=name;$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(!M.rows.length){if(M.preview){$("#filters").style.display="flex";const allowDates=(M.store==="Aéroport M5"||name==="airport"||name==="command"||name==="stores"||name==="benchmark");$("#fStart").disabled=!allowDates;$("#fEnd").disabled=!allowDates;previewRoute(name)}else previewUnlock();return}$("#filters").style.display="flex";const routes={command,products:productsPage,time:timePage,pulse:pulsePage,benchmark:benchmarkPage,opportunities:opportunitiesPage,actions:actionsPage,quality:qualityPage};try{routes[name]()}catch(e){console.error(e);C.innerHTML='<div class="notice">Un calcul a échoué : '+escape(e.message)+'. Rechargez la page ; les données importées restent dans le navigateur.</div>'}}
 async function init(){
  try{
   M.db=await openDatabase();M.rows=await read("rows")||[];M.actions=await read("actions")||[];window._fineImports=await read("imports")||[];
