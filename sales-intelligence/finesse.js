@@ -304,7 +304,7 @@ function airportPrecision(mode){
  const source=M.airportRows||[],rows=source.filter(x=>(!M.start||x[1]>=M.start)&&(!M.end||x[1]<=M.end)&&(!M.family||x[3]===M.family)&&(!M.category||x[4]===M.category));
  const a=baseAgg(rows),t=a.rev,products=[...a.products].sort((x,y)=>y[1].rev-x[1].rev),byHour=rank(a.hours),byDay=[...a.daily].sort((x,y)=>x[0].localeCompare(y[0])),byFam=rank(a.families),store="Aéroport M5";
  const caveat='<div class="notice"><b>Export partiel Aéroport M5 :</b> fichier de 3 158 lignes (80 863 DH sur toutes les dates), provenant d’un seul magasin. Données du 12 octobre au 9 novembre 2026, malgré un nom de fichier se terminant au 8 novembre. Forte concentration du CA du 5 au 8 novembre : ne pas comparer ce magasin à un réseau entièrement actualisé.</div>';
- const simpleProd=table(["#","Produit","CA","Qté payée","Part CA"],products.slice(0,150).map((x,i)=>'<tr><td>'+num(i+1)+'</td><td><b>'+escape(x[0])+'</b></td><td class="r">'+mad(x[1].rev)+'</td><td class="r">'+num(x[1].qty)+'</td><td class="r">'+pct(100*x[1].rev/(t||1))+'</td></tr>'));
+ const simpleProd=table(["#","Produit","CA","Qté payée","Part CA"],products.map((x,i)=>'<tr><td>'+num(i+1)+'</td><td><b>'+escape(x[0])+'</b></td><td class="r">'+mad(x[1].rev)+'</td><td class="r">'+num(x[1].qty)+'</td><td class="r">'+pct(100*x[1].rev/(t||1))+'</td></tr>'));
  const times=Array.from({length:24},(_,h)=>[h,a.hours.get(h)||0]);
  const hourChart='<div class="hourchart">'+times.map(([h,v])=>'<div class="houritem" title="'+h+'h : '+mad(v)+'"><div class="hourcolumn" style="height:'+Math.max(2,v/Math.max(1,...a.hours.values())*159)+'px"></div><small>'+(h%3===0?h+"h":"")+'</small></div>').join("")+'</div>';
  function overview(){
